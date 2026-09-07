@@ -105,6 +105,17 @@ export function scoreBlock(forecast, activityId, terrain = 'plains') {
     rawFactors.humidity * weights.humidity +
     rawFactors.uvIndex * weights.uvIndex;
 
+  // Determine risk level using activity-specific thresholds
+  const { high, moderate } = activity.thresholds;
+  let riskLevel;
+  if (totalScore >= high) {
+    riskLevel = 'HIGH_RISK';
+  } else if (totalScore >= moderate) {
+    riskLevel = 'MODERATE';
+  } else {
+    riskLevel = 'SAFE';
+  }
+
   // Apply specific hard-rules requested: >60% rain or >40km/h wind = HIGH RISK, 30-60% = MODERATE, else SAFE
   const actualRain = forecast.rainProbability || 0;
   const actualWind = forecast.windSpeed || 0;
