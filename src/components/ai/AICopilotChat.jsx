@@ -21,6 +21,7 @@ export function AICopilotChat() {
   const userType = useAppStore((s) => s.userType);
   const setSelectedActivity = useAppStore((s) => s.setSelectedActivity);
   const setLocation = useAppStore((s) => s.setLocation);
+  const setForecastBlocks = useAppStore((s) => s.setForecastBlocks);
   const setRiskResult = useAppStore((s) => s.setRiskResult);
   const setScreen = useAppStore((s) => s.setScreen);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
@@ -169,6 +170,7 @@ export function AICopilotChat() {
     if (!msg.card) return;
     setSelectedActivity(msg.card.activityId);
     if (msg.cityObj) setLocation(msg.cityObj);
+    if (msg.forecastBlocks) setForecastBlocks(msg.forecastBlocks);
     if (msg.riskResult) setRiskResult(msg.riskResult);
     setActiveTab('planner');
     setScreen('input');
@@ -178,6 +180,7 @@ export function AICopilotChat() {
     if (!msg.card) return;
     setSelectedActivity(msg.card.activityId);
     if (msg.cityObj) setLocation(msg.cityObj);
+    if (msg.forecastBlocks) setForecastBlocks(msg.forecastBlocks);
     if (msg.riskResult) setRiskResult(msg.riskResult);
     setLiveMonitoring(true);
     setActiveTab('monitor');
