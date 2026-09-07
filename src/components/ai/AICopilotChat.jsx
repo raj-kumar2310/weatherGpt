@@ -458,29 +458,56 @@ export function AICopilotChat() {
           </div>
         </div>
 
-        {/* Location Choice Selector Bar */}
-        <div className="bg-slate-900/90 text-white px-4 py-2 border-b border-slate-800 flex items-center justify-between gap-3 text-xs overflow-x-auto scrollbar-hide flex-shrink-0">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <MapPin size={14} className="text-sky-400 animate-pulse" />
-            <span className="font-extrabold text-slate-300">Target Location:</span>
-            <select
-              value={location?.name || 'Coimbatore'}
-              onChange={(e) => handleSelectCity(e.target.value)}
-              className="bg-slate-800 text-white border border-slate-700 font-bold px-3 py-1 rounded-xl text-xs focus:outline-none focus:border-sky-500 cursor-pointer"
-            >
-              <option value="Coimbatore">🏙️ Coimbatore (Basin)</option>
-              <option value="Kuniyamuthur">🏡 Kuniyamuthur (Coimbatore South)</option>
-              <option value="Ooty">🏔️ Ooty (Nilgiris Belt)</option>
-              <option value="Valparai">🌿 Valparai (Anamalai Range)</option>
-              <option value="Chennai">🏖️ Chennai (Coastal)</option>
-              <option value="Madurai">🏛️ Madurai (Vaigai Basin)</option>
-              <option value="Trichy">🌾 Trichy (Kaveri Delta)</option>
-              <option value="Salem">⛰️ Salem (Plateau)</option>
-              <option value="Kodaikanal">🌲 Kodaikanal (Palani Hills)</option>
-              <option value="Rameswaram">🎣 Rameswaram (Coastal)</option>
-              <option value="Thanjavur">🚜 Thanjavur (Delta)</option>
-              <option value="Pollachi">🌴 Pollachi (Foothills)</option>
-            </select>
+        {/* Location Choice Bar with Live Searchable Input */}
+        <div className="bg-slate-900/90 text-white px-4 py-2 border-b border-slate-800 flex items-center justify-between gap-3 text-xs overflow-x-auto scrollbar-hide flex-shrink-0 relative">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-1 max-w-sm">
+            <MapPin size={14} className="text-sky-400 animate-pulse flex-shrink-0" />
+            <span className="font-extrabold text-slate-300 flex-shrink-0">Target Location:</span>
+
+            {/* Inline Searchable Location Input */}
+            <div className="relative flex-1">
+              <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 focus-within:border-sky-400 rounded-xl px-3 py-1.5 transition-all">
+                <Search size={13} className="text-sky-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  value={mapSearchQuery || location?.name || 'Coimbatore'}
+                  onChange={(e) => handleMapSearchChange(e.target.value)}
+                  onFocus={() => {
+                    if (mapSearchQuery.length >= 2) searchCities(mapSearchQuery).then(setSearchResults);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && mapSearchQuery.trim()) {
+                      handleSelectCity(mapSearchQuery.trim());
+                    }
+                  }}
+                  placeholder="Type any city / location (e.g. Kuniyamuthur)..."
+                  className="bg-transparent text-white text-xs font-bold w-full focus:outline-none placeholder:text-slate-500"
+                />
+              </div>
+
+              {/* Autocomplete Dropdown List */}
+              {searchResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-56 overflow-y-auto">
+                  {isSearching && (
+                    <div className="p-3 text-[11px] text-slate-400 font-bold">Searching locations...</div>
+                  )}
+                  {searchResults.map((res, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelectCity(res.name)}
+                      className="px-3.5 py-2.5 hover:bg-sky-500/20 text-xs font-bold text-slate-200 hover:text-white flex items-center justify-between cursor-pointer border-b border-slate-800/60 last:border-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-sky-400" />
+                        <span>{res.name}</span>
+                        <span className="text-[10px] text-slate-400 font-normal">({res.state || 'IN'})</span>
+                      </div>
+                      <span className="text-[10px] text-sky-400 font-black uppercase">Select</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
