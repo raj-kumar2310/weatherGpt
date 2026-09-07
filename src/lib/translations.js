@@ -5,7 +5,7 @@
 export const TRANSLATIONS = {
   en: {
     // Navigation & Header
-    appTitle: 'WeatherGPT',
+    appTitle: 'WeatherAction',
     appSubtitle: 'Weather Decision Engine',
     personaSuffix: 'Mode',
     navHome: 'Home',

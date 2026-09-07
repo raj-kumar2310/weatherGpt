@@ -322,7 +322,7 @@ export function HomeScreen() {
               <Zap size={22} />
             </div>
             <div>
-              <h4 className="font-extrabold text-slate-900 text-sm">Ask WeatherGPT</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm">Ask WeatherAction Assistant</h4>
               <p className="text-[11px] text-slate-500 mt-0.5">Open-ended voice AI</p>
             </div>
           </button>

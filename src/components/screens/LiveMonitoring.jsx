@@ -114,6 +114,9 @@ export function LiveMonitoring() {
   const simulatedAlert = useAppStore((s) => s.simulatedAlert);
   const triggerSimulation = useAppStore((s) => s.triggerSimulation);
   const simulationActive = useAppStore((s) => s.simulationActive);
+  const routeMode = useAppStore((s) => s.routeMode);
+  const origin = useAppStore((s) => s.origin);
+  const destination = useAppStore((s) => s.destination);
 
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [localAlert, setLocalAlert] = useState(null);
@@ -176,7 +179,11 @@ export function LiveMonitoring() {
               <span>{activity?.icon}</span>
               <span>{activity?.name} Safety Radar</span>
             </h2>
-            <p className="text-xs text-slate-500">Target Zone: {location?.name || 'Coimbatore'} · {location?.zone || 'Micro-zone'}</p>
+            <p className="text-xs text-slate-500">
+              Target Zone: {routeMode === 'route' && origin && destination
+                ? `${origin.name} → ${destination.name} (Highest Risk Checkpoint: ${destination.name} — ${display.label})`
+                : `${location?.name || 'Coimbatore'} · ${location?.zone || 'Micro-zone'}`}
+            </p>
           </div>
 
           {/* Mode Badge & Last updated / cache indicator */}

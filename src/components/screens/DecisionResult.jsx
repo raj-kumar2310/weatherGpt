@@ -438,8 +438,8 @@ export function DecisionResult() {
               className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-2xl shadow-xs hover:border-sky-300 hover:text-sky-600 transition-all text-sm"
               whileTap={{ scale: 0.97 }}
               onClick={() => {
-                const text = `Weather Decision: ${display.label} for ${activity?.name} | Risk Score: ${riskResult?.overall?.totalScore}/100 | WeatherGPT`;
-                if (navigator.share) navigator.share({ title: 'WeatherGPT Plan', text });
+                const text = `Weather Decision: ${display.label} for ${activity?.name} | Risk Score: ${riskResult?.overall?.totalScore}/100 | WeatherAction`;
+                if (navigator.share) navigator.share({ title: 'WeatherAction Plan', text });
                 else navigator.clipboard?.writeText(text);
               }}
             >

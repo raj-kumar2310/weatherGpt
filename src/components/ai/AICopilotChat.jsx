@@ -395,7 +395,7 @@ export function AICopilotChat() {
             {/* Sidebar Footer */}
             <div className="p-3 bg-slate-950/60 border-t border-slate-800 text-[11px] text-slate-400 flex justify-between items-center flex-shrink-0">
               <span>Sessions: {sessions.length}</span>
-              <span className="text-sky-400 font-semibold">WeatherGPT Engine</span>
+              <span className="text-sky-400 font-semibold">WeatherAction Engine</span>
             </div>
           </motion.div>
         )}
@@ -420,7 +420,7 @@ export function AICopilotChat() {
 
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-base tracking-tight">WeatherGPT AI Assistant</h3>
+                <h3 className="font-extrabold text-base tracking-tight">WeatherAction Assistant</h3>
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   Online
                 </span>
@@ -674,7 +674,7 @@ export function AICopilotChat() {
               animate={{ opacity: 1 }}
             >
               <Bot size={16} className="text-indigo-600 animate-bounce" />
-              <span>Analyzing micro-zones & generating WeatherGPT decision…</span>
+              <span>Analyzing micro-zones & generating WeatherAction decision…</span>
             </motion.div>
           )}
 
