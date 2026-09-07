@@ -4,7 +4,7 @@
  * Falls back to localStorage cache when API is unavailable.
  */
 
-import { TAMIL_NADU_CITIES } from './activityConfig';
+import { TAMIL_NADU_CITIES, matchCity } from './activityConfig';
 
 const API_KEY = process.env.NEXT_PUBLIC_OWM_API_KEY || 'demo';
 const BASE_URL = 'https://api.openweathermap.org';
@@ -140,10 +140,12 @@ export async function searchCities(query) {
   if (!query || query.trim().length < 1) return [];
   const qClean = query.trim().toLowerCase();
 
-  // Instant offline match from local dataset
-  const localMatches = TAMIL_NADU_CITIES.filter((c) =>
-    c.name.toLowerCase().includes(qClean)
-  );
+  // Instant offline match from local dataset with Tanglish alias support
+  const matched = matchCity(query);
+  const localMatches = matched
+    ? [matched]
+    : TAMIL_NADU_CITIES.filter((c) => c.name.toLowerCase().includes(qClean));
+
   if (localMatches.length > 0) {
     return localMatches.map((c) => ({
       ...c,

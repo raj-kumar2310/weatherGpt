@@ -4,7 +4,7 @@
  * Integrates Google Gemini AI for intelligent context-aware weather advice.
  */
 
-import { ACTIVITIES, TAMIL_NADU_CITIES } from './activityConfig';
+import { ACTIVITIES, TAMIL_NADU_CITIES, matchCity } from './activityConfig';
 import { evaluateTimeline, getRiskDisplay } from './riskEngine';
 import { searchCities, fetchForecast, fetchCurrentWeather, normalizeCurrentWeather } from './weatherApi';
 
@@ -51,12 +51,12 @@ async function callGeminiAPI(prompt) {
  * Quick prompt suggestions for the chat interface
  */
 export const SUGGESTION_PROMPTS = [
+  { text: 'Nalaki namakal aha rain chance eruka?', icon: '🌧️' },
   { text: 'Nalaki weather enna epdi erukum entha place polama entha activity panalama?', icon: '✨' },
   { text: 'Which place in Tamil Nadu is best to visit tomorrow?', icon: '📍' },
   { text: 'What is the current temperature in Coimbatore?', icon: '🌡️' },
   { text: 'Can I go for a run in Kuniyamuthur tomorrow at 5 AM?', icon: '🏃' },
   { text: 'Is it safe to spray pesticides in Tanjavur paddy field today?', icon: '🌾' },
-  { text: 'Should I drive through Valparai ghat road this afternoon?', icon: '🚗' },
 ];
 
 /**
@@ -64,6 +64,9 @@ export const SUGGESTION_PROMPTS = [
  */
 function parseIntentFallback(query) {
   const q = query.toLowerCase();
+
+  const isTomorrow = ['nalaki', 'naalaki', 'naalai', 'nalaiku', 'tomorrow', 'next day', 'nalai'].some((k) => q.includes(k));
+  const isRainQuery = ['rain', 'mazhai', 'mazai', 'rainu', 'chance'].some((k) => q.includes(k));
 
   const activityKeywords = [
     'run', 'jog', 'walk', 'marathon', 'sprint', 'bike', 'cycling', 'ride', 'cycle',
@@ -78,6 +81,8 @@ function parseIntentFallback(query) {
       isActivityQuery: false,
       locationName: city.name,
       city,
+      isTomorrow,
+      isRainQuery,
     };
   }
 
@@ -119,25 +124,23 @@ function parseIntentFallback(query) {
     activityName,
     activityIcon,
     city,
+    isTomorrow,
+    isRainQuery,
   };
 }
 
 /**
- * Fallback city parser
+ * Fallback city parser with Tanglish alias support
  */
 function parseCityFallback(query) {
-  const q = query.toLowerCase();
-  for (const city of TAMIL_NADU_CITIES) {
-    if (q.includes(city.name.toLowerCase())) {
-      return city;
-    }
-  }
+  const matched = matchCity(query);
+  if (matched) return matched;
   // Default to Coimbatore if no match
   return TAMIL_NADU_CITIES.find((c) => c.name === 'Coimbatore') || TAMIL_NADU_CITIES[0];
 }
 
 /**
- * Call Gemini AI to extract intent: isActivityQuery, location, activity, time window
+ * Call Gemini AI to extract intent: isActivityQuery, location, activity, time window, date target
  */
 async function extractIntentWithGemini(query) {
   if (!GEMINI_API_KEY) return null;
@@ -145,12 +148,14 @@ async function extractIntentWithGemini(query) {
     const prompt = `Analyze this user weather chatbot query: "${query}"
 Extract intent as JSON with structure:
 {
-  "isActivityQuery": boolean (Set to true ONLY if user asks about planning/doing a specific outdoor activity or safety for an activity like running, cycling, trip, farming, fishing, drive, event. Set to false if user asks for temperature, current weather, greetings, climate, or general info),
-  "locationName": "location or city mentioned (e.g. Palani, Coimbatore, Kuniyamuthur, Ooty, Tanjavur, Pollachi, Madurai)",
+  "isActivityQuery": boolean (Set to true ONLY if user asks about planning/doing a specific outdoor activity or safety for an activity like running, cycling, trip, farming, fishing, drive, event. Set to false if user asks for temperature, current weather, rain chance, greetings, climate, or general info),
+  "locationName": "location or city mentioned (e.g. Namakkal, Palani, Coimbatore, Kuniyamuthur, Ooty, Tanjavur, Pollachi, Madurai)",
+  "isTomorrow": boolean (Set to true if user asks about tomorrow / nalaki / nalai / future day, false if today / iniku / current),
+  "isRainQuery": boolean (Set to true if user asks specifically about rain / rain chance / mazhai),
   "activityId": "one of: bike_ride, picnic, farming, travel, outdoor_event, fishing or null",
-  "activityName": "specific action name (e.g. Running, Morning Walk, Bike Ride, Pesticide Spray, Ghat Drive, Sea Fishing) or null",
-  "activityIcon": "relevant emoji (e.g. 🏃, 🚴, 🌾, 🚗, 🧺, 🎣, 🎪) or null",
-  "timeWindow": "time requested if specified (e.g. 5:00 AM, 7:00 AM, Afternoon) or null"
+  "activityName": "specific action name or null",
+  "activityIcon": "relevant emoji or null",
+  "timeWindow": "time requested if specified or null"
 }
 Return raw JSON ONLY. No markdown wrapper.`;
 
@@ -166,27 +171,38 @@ Return raw JSON ONLY. No markdown wrapper.`;
 /**
  * Call Gemini API to answer conversational & ChatGPT decision-making weather queries
  */
-async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastData, language = 'en') {
+async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastData, isTomorrow, isRainQuery, language = 'en') {
   if (!GEMINI_API_KEY) return null;
   try {
-    const temp = currentWeatherData?.temp || forecastData?.[0]?.temp || 27;
-    const feelsLike = currentWeatherData?.feelsLike || forecastData?.[0]?.feelsLike || 29;
-    const humidity = currentWeatherData?.humidity || forecastData?.[0]?.humidity || 68;
-    const windSpeed = currentWeatherData?.windSpeed || Math.round(forecastData?.[0]?.windSpeed || 12);
-    const weatherDesc = currentWeatherData?.weatherDesc || forecastData?.[0]?.weatherDesc || 'scattered clouds';
-    const rainProb = forecastData?.[0]?.rainProbability || 10;
+    let targetBlock = forecastData?.[0] || {};
+    if (isTomorrow && forecastData?.length >= 4) {
+      const tomorrowBlocks = forecastData.slice(4, 12);
+      if (tomorrowBlocks.length > 0) {
+        targetBlock = tomorrowBlocks.reduce((max, b) => (b.rainProbability > max.rainProbability ? b : max), tomorrowBlocks[0]);
+      }
+    }
+
+    const temp = targetBlock.temp || currentWeatherData?.temp || 27;
+    const feelsLike = targetBlock.feelsLike || currentWeatherData?.feelsLike || 29;
+    const humidity = targetBlock.humidity || currentWeatherData?.humidity || 68;
+    const windSpeed = Math.round(targetBlock.windSpeed || currentWeatherData?.windSpeed || 12);
+    const weatherDesc = targetBlock.weatherDesc || currentWeatherData?.weatherDesc || 'scattered clouds';
+    const rainProb = targetBlock.rainProbability ?? currentWeatherData?.rainProbability ?? 10;
 
     const qLower = query.toLowerCase();
-    const isDecisionQuery = ['place', 'where', 'activity', 'polama', 'panalama', 'nalaki', 'tomorrow', 'suggest', 'recommend', 'plan', 'which'].some((k) => qLower.includes(k));
-    const langPrompt = language === 'ta' ? 'LANGUAGE INSTRUCTION: The user selected TAMIL (தமிழ்). Please provide the response in clear, helpful Tamil with Tamil markdown titles.' : '';
+    const isDecisionQuery = ['place', 'where', 'activity', 'polama', 'panalama', 'suggest', 'recommend', 'plan', 'which'].some((k) => qLower.includes(k));
+    const langPrompt = language === 'ta' ? 'LANGUAGE INSTRUCTION: The user selected TAMIL (தமிழ்). Please provide the response in clear, helpful Tamil.' : '';
 
-    const prompt = `You are WeatherAction ChatGPT AI, a smart decision-making weather & travel expert assistant for Tamil Nadu, India.
+    const prompt = `You are WeatherAction ChatGPT AI, a smart decision-making weather assistant for Tamil Nadu, India.
 User query: "${query}"
 Selected Target Location: ${cityObj.name} (${cityObj.zone})
-Current Live Weather Data:
+Day Requested: ${isTomorrow ? 'TOMORROW (Nalaki)' : 'Today'}
+Query Focus: ${isRainQuery ? 'Rain Probability / Rain Chance' : 'General Weather'}
+
+Weather Data for ${cityObj.name} (${isTomorrow ? 'Tomorrow' : 'Current'}):
+- Rain Probability: ${rainProb}%
 - Temperature: ${temp}°C (Feels like ${feelsLike}°C)
 - Condition: ${weatherDesc}
-- Rain Probability: ${rainProb}%
 - Wind Speed: ${windSpeed} km/h
 - Humidity: ${humidity}%
 
@@ -195,12 +211,12 @@ ${langPrompt}
 ${
   isDecisionQuery
     ? `The user wants a ChatGPT-style DECISION on tomorrow's weather, which place to visit, and which outdoor activity to do!
-Please format your response into 4 distinct, elegant markdown sections:
-1. ☀️ **Tomorrow's Weather Forecast** (Summarize forecast for ${cityObj.name} & Tamil Nadu micro-zones).
-2. 📍 **Recommended Places to Visit** (Suggest 2 top destinations like Ooty for hills, Coimbatore for plains, Tanjavur for farming, etc.).
-3. 🚴 **Best Activities to Do** (Recommend 2 safe outdoor activities like morning running, picnic, or travel with timing).
-4. ⚠️ **Safety Tip & Places to Avoid** (Highlight any fog/rain/wind risk areas like ghat roads).`
-    : `Answer the user's question directly and conversationally in 2-3 well-formatted sentences using markdown bold highlights for temperature and key numbers. If they asked for temperature, clearly highlight the temperature. Be helpful, concise, and friendly like ChatGPT.`
+Please format your response into 4 distinct markdown sections:
+1. ☀️ **Tomorrow's Weather Forecast** (Summarize forecast for ${cityObj.name}).
+2. 📍 **Recommended Places to Visit**
+3. 🚴 **Best Activities to Do**
+4. ⚠️ **Safety Tip & Places to Avoid**`
+    : `Answer the user's question directly and conversationally in 2-3 sentences using markdown bold highlights. Explicitly state the rain probability (${rainProb}%) and weather for ${cityObj.name} ${isTomorrow ? 'tomorrow' : 'today'}.`
 }`;
 
     return await callGeminiAPI(prompt);
@@ -247,28 +263,41 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
     ? geminiIntent.isActivityQuery 
     : fallbackIntent.isActivityQuery;
 
+  const isTomorrow = geminiIntent?.isTomorrow !== undefined
+    ? geminiIntent.isTomorrow
+    : fallbackIntent.isTomorrow;
+
+  const isRainQuery = geminiIntent?.isRainQuery !== undefined
+    ? geminiIntent.isRainQuery
+    : fallbackIntent.isRainQuery;
+
   const locationName = geminiIntent?.locationName || fallbackIntent.locationName;
-  const fallbackCity = fallbackIntent.city || parseCityFallback(query);
+  const fallbackCity = matchCity(query) || fallbackIntent.city || parseCityFallback(query);
 
   // Step 2: Resolve Location & Geocode via OpenWeather API
   let cityObj = fallbackCity;
   try {
-    const geoResults = await searchCities(locationName);
-    if (geoResults && geoResults.length > 0) {
-      const geo = geoResults[0];
-      const isHill = ['ooty', 'valparai', 'kodaikanal', 'coonoor'].some((h) =>
-        (geo.name || locationName).toLowerCase().includes(h)
-      );
-      const isCoast = ['rameswaram', 'chennai', 'cuddalore', 'kanyakumari', 'nagapattinam'].some((c) =>
-        (geo.name || locationName).toLowerCase().includes(c)
-      );
-      cityObj = {
-        name: geo.name || locationName,
-        lat: geo.lat,
-        lon: geo.lon,
-        zone: geo.state ? `${geo.name} (${geo.state})` : `${locationName} Micro-zone`,
-        terrain: isHill ? 'hills' : isCoast ? 'coastal' : 'plains',
-      };
+    const matchedLocal = matchCity(locationName || query);
+    if (matchedLocal) {
+      cityObj = matchedLocal;
+    } else {
+      const geoResults = await searchCities(locationName);
+      if (geoResults && geoResults.length > 0) {
+        const geo = geoResults[0];
+        const isHill = ['ooty', 'valparai', 'kodaikanal', 'coonoor'].some((h) =>
+          (geo.name || locationName).toLowerCase().includes(h)
+        );
+        const isCoast = ['rameswaram', 'chennai', 'cuddalore', 'kanyakumari', 'nagapattinam'].some((c) =>
+          (geo.name || locationName).toLowerCase().includes(c)
+        );
+        cityObj = {
+          name: geo.name || locationName,
+          lat: geo.lat,
+          lon: geo.lon,
+          zone: geo.state ? `${geo.name} (${geo.state})` : `${locationName} Micro-zone`,
+          terrain: isHill ? 'hills' : isCoast ? 'coastal' : 'plains',
+        };
+      }
     }
   } catch {}
 
@@ -288,20 +317,37 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
   // CASE 1: Conversational Weather / Temperature Query (isActivityQuery = false)
   // -------------------------------------------------------------
   if (!isActivityQuery) {
-    let generalText = await fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastBlocks, language);
+    let generalText = await fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastBlocks, isTomorrow, isRainQuery, language);
 
     if (!generalText) {
-      const temp = currentWeatherData?.temp || forecastBlocks?.[0]?.temp || 27;
-      const feelsLike = currentWeatherData?.feelsLike || forecastBlocks?.[0]?.feelsLike || 29;
-      const desc = currentWeatherData?.weatherDesc || forecastBlocks?.[0]?.weatherDesc || 'clear sky';
-      const humidity = currentWeatherData?.humidity || forecastBlocks?.[0]?.humidity || 68;
-      const windSpeed = currentWeatherData?.windSpeed || Math.round(forecastBlocks?.[0]?.windSpeed || 12);
-      const rainProb = forecastBlocks?.[0]?.rainProbability || 10;
+      let targetBlock = forecastBlocks[0] || {};
+      if (isTomorrow && forecastBlocks.length >= 4) {
+        const tomorrowBlocks = forecastBlocks.slice(4, 12);
+        if (tomorrowBlocks.length > 0) {
+          targetBlock = tomorrowBlocks.reduce((max, b) => (b.rainProbability > max.rainProbability ? b : max), tomorrowBlocks[0]);
+        }
+      }
 
-      generalText = `The current temperature in **${cityObj.name}** is **${temp}°C** (Feels like **${feelsLike}°C**) with **${desc}** 🌤️.\n\n` +
-        `• 🌧️ Rain Probability: **${rainProb}%**\n` +
-        `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
-        `• 💧 Humidity: **${humidity}%**`;
+      const temp = targetBlock.temp || currentWeatherData?.temp || 27;
+      const feelsLike = targetBlock.feelsLike || currentWeatherData?.feelsLike || 29;
+      const desc = targetBlock.weatherDesc || currentWeatherData?.weatherDesc || 'clear sky';
+      const humidity = targetBlock.humidity || currentWeatherData?.humidity || 68;
+      const windSpeed = Math.round(targetBlock.windSpeed || currentWeatherData?.windSpeed || 12);
+      const rainProb = targetBlock.rainProbability ?? currentWeatherData?.rainProbability ?? 10;
+      const timeLabel = isTomorrow ? 'Tomorrow' : 'Currently';
+
+      if (isTomorrow) {
+        generalText = `${timeLabel} in **${cityObj.name}**, the rain probability is **${rainProb}%** with **${desc}** 🌤️.\n\n` +
+          `• 🌧️ Rain Probability: **${rainProb}%**\n` +
+          `• 🌡️ Temperature: **${temp}°C** (Feels like **${feelsLike}°C**)\n` +
+          `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
+          `• 💧 Humidity: **${humidity}%**`;
+      } else {
+        generalText = `The current temperature in **${cityObj.name}** is **${temp}°C** (Feels like **${feelsLike}°C**) with **${desc}** 🌤️.\n\n` +
+          `• 🌧️ Rain Probability: **${rainProb}%**\n` +
+          `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
+          `• 💧 Humidity: **${humidity}%**`;
+      }
     }
 
     return {

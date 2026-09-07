@@ -149,54 +149,95 @@ export const PERSONA_RECOMMENDATIONS = {
   },
 };
 
-/** Tamil Nadu cities with micro-zone info */
+/** Standardize Tanglish & English city search queries */
+export function normalizeCityString(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/double/g, '')
+    .replace(/kk/g, 'k')
+    .replace(/tt/g, 't')
+    .replace(/pp/g, 'p')
+    .replace(/nn/g, 'n')
+    .replace(/mm/g, 'm')
+    .replace(/ll/g, 'l')
+    .replace(/rr/g, 'r')
+    .replace(/ss/g, 's')
+    .replace(/zh/g, 'z')
+    .replace(/th/g, 't')
+    .replace(/gh/g, 'g')
+    .replace(/dh/g, 'd')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/** Tamil Nadu cities with micro-zone info & Tanglish aliases */
 export const TAMIL_NADU_CITIES = [
-  { name: 'Palani', lat: 10.4500, lon: 77.5200, zone: 'Palani Hills Foothills', terrain: 'hills', elevation: 330 },
-  { name: 'Coimbatore', lat: 11.0168, lon: 76.9558, zone: 'Coimbatore Basin', terrain: 'plains', elevation: 411 },
-  { name: 'Kuniyamuthur', lat: 10.9631, lon: 76.9612, zone: 'Coimbatore South', terrain: 'plains', elevation: 410 },
-  { name: 'Ooty', lat: 11.4102, lon: 76.6950, zone: 'Nilgiris Belt', terrain: 'hills', elevation: 2240 },
-  { name: 'Valparai', lat: 10.3270, lon: 76.9590, zone: 'Anamalai Range', terrain: 'hills', elevation: 1196 },
-  { name: 'Chennai', lat: 13.0827, lon: 80.2707, zone: 'Chennai Coast', terrain: 'coastal', elevation: 6 },
-  { name: 'Madurai', lat: 9.9252, lon: 78.1198, zone: 'Vaigai Basin', terrain: 'plains', elevation: 101 },
-  { name: 'Salem', lat: 11.6643, lon: 78.1460, zone: 'Salem Plateau', terrain: 'plains', elevation: 278 },
-  { name: 'Trichy', lat: 10.7905, lon: 78.7047, zone: 'Kaveri Delta', terrain: 'plains', elevation: 88 },
-  { name: 'Kodaikanal', lat: 10.2381, lon: 77.4892, zone: 'Palani Hills', terrain: 'hills', elevation: 2133 },
-  { name: 'Dindigul', lat: 10.3673, lon: 77.9803, zone: 'Dindigul Basin', terrain: 'plains', elevation: 265 },
-  { name: 'Pollachi', lat: 10.6583, lon: 77.0084, zone: 'Anamalai Foothills', terrain: 'plains', elevation: 293 },
-  { name: 'Mettupalayam', lat: 11.2995, lon: 76.9455, zone: 'Nilgiri Foothills', terrain: 'plains', elevation: 314 },
-  { name: 'Saravanampatti', lat: 11.0805, lon: 76.9947, zone: 'Coimbatore North', terrain: 'plains', elevation: 420 },
-  { name: 'Singanallur', lat: 10.9984, lon: 77.0264, zone: 'Coimbatore East', terrain: 'plains', elevation: 405 },
-  { name: 'Sulur', lat: 11.0253, lon: 77.1264, zone: 'Coimbatore East', terrain: 'plains', elevation: 385 },
-  { name: 'Tiruppur', lat: 11.1085, lon: 77.3411, zone: 'Kongu Region', terrain: 'plains', elevation: 295 },
-  { name: 'Erode', lat: 11.3410, lon: 77.7172, zone: 'Kaveri Basin', terrain: 'plains', elevation: 183 },
-  { name: 'Thanjavur', lat: 10.7870, lon: 79.1378, zone: 'Kaveri Delta', terrain: 'plains', elevation: 57 },
-  { name: 'Tanjavur', lat: 10.7870, lon: 79.1378, zone: 'Kaveri Delta', terrain: 'plains', elevation: 57 },
-  { name: 'Rameswaram', lat: 9.2876, lon: 79.3129, zone: 'Pamban Island', terrain: 'coastal', elevation: 10 },
-  { name: 'Kumbakonam', lat: 10.9602, lon: 79.3845, zone: 'Kaveri Delta', terrain: 'plains', elevation: 26 },
-  { name: 'Karur', lat: 10.9601, lon: 78.0766, zone: 'Kaveri Plains', terrain: 'plains', elevation: 101 },
-  { name: 'Namakkal', lat: 11.2189, lon: 78.1674, zone: 'Namakkal Belt', terrain: 'plains', elevation: 218 },
-  { name: 'Tirunelveli', lat: 8.7139, lon: 77.7567, zone: 'Thamirabarani Basin', terrain: 'plains', elevation: 47 },
-  { name: 'Thoothukudi', lat: 8.7642, lon: 78.1348, zone: 'Coromandel Coast', terrain: 'coastal', elevation: 4 },
-  { name: 'Tuticorin', lat: 8.7642, lon: 78.1348, zone: 'Coromandel Coast', terrain: 'coastal', elevation: 4 },
-  { name: 'Kanyakumari', lat: 8.0883, lon: 77.5385, zone: 'Cape Comorin', terrain: 'coastal', elevation: 0 },
-  { name: 'Nagercoil', lat: 8.1833, lon: 77.4119, zone: 'Southern Coast', terrain: 'coastal', elevation: 40 },
-  { name: 'Hosur', lat: 12.7409, lon: 77.8253, zone: 'Deccan Plateau', terrain: 'plains', elevation: 879 },
-  { name: 'Vellore', lat: 12.9165, lon: 79.1325, zone: 'Palar Basin', terrain: 'plains', elevation: 220 },
-  { name: 'Kanchipuram', lat: 12.8342, lon: 79.7036, zone: 'Temple Town', terrain: 'plains', elevation: 83 },
-  { name: 'Cuddalore', lat: 11.7480, lon: 79.7714, zone: 'Coromandel Coast', terrain: 'coastal', elevation: 6 },
-  { name: 'Villupuram', lat: 11.9401, lon: 79.4861, zone: 'Interior Plain', terrain: 'plains', elevation: 44 },
-  { name: 'Pondicherry', lat: 11.9416, lon: 79.8083, zone: 'Pondicherry Coast', terrain: 'coastal', elevation: 3 },
-  { name: 'Puducherry', lat: 11.9416, lon: 79.8083, zone: 'Pondicherry Coast', terrain: 'coastal', elevation: 3 },
-  { name: 'Nagapattinam', lat: 10.7656, lon: 79.8424, zone: 'Delta Coast', terrain: 'coastal', elevation: 9 },
-  { name: 'Tenkasi', lat: 8.9593, lon: 77.3148, zone: 'Ghats Border', terrain: 'hills', elevation: 143 },
-  { name: 'Theni', lat: 10.0104, lon: 77.4768, zone: 'Cardamom Foothills', terrain: 'hills', elevation: 280 },
-  { name: 'Virudhunagar', lat: 9.5680, lon: 77.9624, zone: 'Southern Plain', terrain: 'plains', elevation: 102 },
-  { name: 'Ramanathapuram', lat: 9.3639, lon: 78.8395, zone: 'Sethu Coast', terrain: 'coastal', elevation: 10 },
-  { name: 'Sivagangai', lat: 9.8433, lon: 78.4809, zone: 'Vaigai Region', terrain: 'plains', elevation: 102 },
-  { name: 'Pudukkottai', lat: 10.3833, lon: 78.8000, zone: 'Interior Plain', terrain: 'plains', elevation: 100 },
-  { name: 'Coonoor', lat: 11.3530, lon: 76.7959, zone: 'Nilgiri Hills', terrain: 'hills', elevation: 1850 },
-  { name: 'Yercaud', lat: 11.7753, lon: 78.2093, zone: 'Shevaroy Hills', terrain: 'hills', elevation: 1515 },
+  { name: 'Namakkal', aliases: ['namakal', 'namakkal'], lat: 11.2189, lon: 78.1674, zone: 'Namakkal Belt', terrain: 'plains', elevation: 218 },
+  { name: 'Coimbatore', aliases: ['kovai', 'cbe', 'coimbatore'], lat: 11.0168, lon: 76.9558, zone: 'Coimbatore Basin', terrain: 'plains', elevation: 411 },
+  { name: 'Kuniyamuthur', aliases: ['kuniamuthur', 'kuniyamuthur'], lat: 10.9631, lon: 76.9612, zone: 'Coimbatore South', terrain: 'plains', elevation: 410 },
+  { name: 'Palani', aliases: ['palani', 'palani hill'], lat: 10.4500, lon: 77.5200, zone: 'Palani Hills Foothills', terrain: 'hills', elevation: 330 },
+  { name: 'Ooty', aliases: ['ooty', 'udhagamandalam', 'otty'], lat: 11.4102, lon: 76.6950, zone: 'Nilgiris Belt', terrain: 'hills', elevation: 2240 },
+  { name: 'Valparai', aliases: ['valparai'], lat: 10.3270, lon: 76.9590, zone: 'Anamalai Range', terrain: 'hills', elevation: 1196 },
+  { name: 'Chennai', aliases: ['chennai', 'madras'], lat: 13.0827, lon: 80.2707, zone: 'Chennai Coast', terrain: 'coastal', elevation: 6 },
+  { name: 'Madurai', aliases: ['madurai', 'mathurai'], lat: 9.9252, lon: 78.1198, zone: 'Vaigai Basin', terrain: 'plains', elevation: 101 },
+  { name: 'Salem', aliases: ['salem', 'sailam'], lat: 11.6643, lon: 78.1460, zone: 'Salem Plateau', terrain: 'plains', elevation: 278 },
+  { name: 'Trichy', aliases: ['trichy', 'tiruchi', 'tiruchirappalli'], lat: 10.7905, lon: 78.7047, zone: 'Kaveri Delta', terrain: 'plains', elevation: 88 },
+  { name: 'Kodaikanal', aliases: ['kodaikanal', 'kodai'], lat: 10.2381, lon: 77.4892, zone: 'Palani Hills', terrain: 'hills', elevation: 2133 },
+  { name: 'Dindigul', aliases: ['dindigul', 'dingul'], lat: 10.3673, lon: 77.9803, zone: 'Dindigul Basin', terrain: 'plains', elevation: 265 },
+  { name: 'Pollachi', aliases: ['pollachi'], lat: 10.6583, lon: 77.0084, zone: 'Anamalai Foothills', terrain: 'plains', elevation: 293 },
+  { name: 'Mettupalayam', aliases: ['mettupalayam', 'mtp'], lat: 11.2995, lon: 76.9455, zone: 'Nilgiri Foothills', terrain: 'plains', elevation: 314 },
+  { name: 'Saravanampatti', aliases: ['saravanampatti'], lat: 11.0805, lon: 76.9947, zone: 'Coimbatore North', terrain: 'plains', elevation: 420 },
+  { name: 'Singanallur', aliases: ['singanallur'], lat: 10.9984, lon: 77.0264, zone: 'Coimbatore East', terrain: 'plains', elevation: 405 },
+  { name: 'Sulur', aliases: ['sulur'], lat: 11.0253, lon: 77.1264, zone: 'Coimbatore East', terrain: 'plains', elevation: 385 },
+  { name: 'Tiruppur', aliases: ['tiruppur', 'tirupur'], lat: 11.1085, lon: 77.3411, zone: 'Kongu Region', terrain: 'plains', elevation: 295 },
+  { name: 'Erode', aliases: ['erode'], lat: 11.3410, lon: 77.7172, zone: 'Kaveri Basin', terrain: 'plains', elevation: 183 },
+  { name: 'Thanjavur', aliases: ['thanjavur', 'tanjavur', 'tanjore'], lat: 10.7870, lon: 79.1378, zone: 'Kaveri Delta', terrain: 'plains', elevation: 57 },
+  { name: 'Rameswaram', aliases: ['rameswaram', 'rameshwaram'], lat: 9.2876, lon: 79.3129, zone: 'Pamban Island', terrain: 'coastal', elevation: 10 },
+  { name: 'Kumbakonam', aliases: ['kumbakonam'], lat: 10.9602, lon: 79.3845, zone: 'Kaveri Delta', terrain: 'plains', elevation: 26 },
+  { name: 'Karur', aliases: ['karur'], lat: 10.9601, lon: 78.0766, zone: 'Kaveri Plains', terrain: 'plains', elevation: 101 },
+  { name: 'Tirunelveli', aliases: ['tirunelveli', 'nelai', 'nellai'], lat: 8.7139, lon: 77.7567, zone: 'Thamirabarani Basin', terrain: 'plains', elevation: 47 },
+  { name: 'Thoothukudi', aliases: ['thoothukudi', 'tuticorin', 'thothukudi'], lat: 8.7642, lon: 78.1348, zone: 'Coromandel Coast', terrain: 'coastal', elevation: 4 },
+  { name: 'Kanyakumari', aliases: ['kanyakumari', 'kaniyakumari'], lat: 8.0883, lon: 77.5385, zone: 'Cape Comorin', terrain: 'coastal', elevation: 0 },
+  { name: 'Nagercoil', aliases: ['nagercoil', 'nagarcoil'], lat: 8.1833, lon: 77.4119, zone: 'Southern Coast', terrain: 'coastal', elevation: 40 },
+  { name: 'Hosur', aliases: ['hosur'], lat: 12.7409, lon: 77.8253, zone: 'Deccan Plateau', terrain: 'plains', elevation: 879 },
+  { name: 'Vellore', aliases: ['vellore'], lat: 12.9165, lon: 79.1325, zone: 'Palar Basin', terrain: 'plains', elevation: 220 },
+  { name: 'Kanchipuram', aliases: ['kanchipuram', 'kanchi'], lat: 12.8342, lon: 79.7036, zone: 'Temple Town', terrain: 'plains', elevation: 83 },
+  { name: 'Cuddalore', aliases: ['cuddalore'], lat: 11.7480, lon: 79.7714, zone: 'Coromandel Coast', terrain: 'coastal', elevation: 6 },
+  { name: 'Villupuram', aliases: ['villupuram'], lat: 11.9401, lon: 79.4861, zone: 'Interior Plain', terrain: 'plains', elevation: 44 },
+  { name: 'Puducherry', aliases: ['puducherry', 'pondicherry', 'pondy'], lat: 11.9416, lon: 79.8083, zone: 'Pondicherry Coast', terrain: 'coastal', elevation: 3 },
+  { name: 'Nagapattinam', aliases: ['nagapattinam'], lat: 10.7656, lon: 79.8424, zone: 'Delta Coast', terrain: 'coastal', elevation: 9 },
+  { name: 'Tenkasi', aliases: ['tenkasi'], lat: 8.9593, lon: 77.3148, zone: 'Ghats Border', terrain: 'hills', elevation: 143 },
+  { name: 'Theni', aliases: ['theni'], lat: 10.0104, lon: 77.4768, zone: 'Cardamom Foothills', terrain: 'hills', elevation: 280 },
+  { name: 'Virudhunagar', aliases: ['virudhunagar'], lat: 9.5680, lon: 77.9624, zone: 'Southern Plain', terrain: 'plains', elevation: 102 },
+  { name: 'Ramanathapuram', aliases: ['ramanathapuram', 'ramnad'], lat: 9.3639, lon: 78.8395, zone: 'Sethu Coast', terrain: 'coastal', elevation: 10 },
+  { name: 'Sivagangai', aliases: ['sivagangai', 'sivaganga'], lat: 9.8433, lon: 78.4809, zone: 'Vaigai Region', terrain: 'plains', elevation: 102 },
+  { name: 'Pudukkottai', aliases: ['pudukkottai'], lat: 10.3833, lon: 78.8000, zone: 'Interior Plain', terrain: 'plains', elevation: 100 },
+  { name: 'Coonoor', aliases: ['coonoor'], lat: 11.3530, lon: 76.7959, zone: 'Nilgiri Hills', terrain: 'hills', elevation: 1850 },
+  { name: 'Yercaud', aliases: ['yercaud'], lat: 11.7753, lon: 78.2093, zone: 'Shevaroy Hills', terrain: 'hills', elevation: 1515 },
 ];
+
+/** Robust city matcher for Tanglish spelling variants */
+export function matchCity(query) {
+  if (!query || typeof query !== 'string') return null;
+  const qRaw = query.toLowerCase();
+  const qNorm = normalizeCityString(query);
+
+  for (const city of TAMIL_NADU_CITIES) {
+    const nameNorm = normalizeCityString(city.name);
+    if (qRaw.includes(city.name.toLowerCase()) || (nameNorm.length >= 4 && qNorm.includes(nameNorm))) {
+      return city;
+    }
+    if (city.aliases) {
+      for (const alias of city.aliases) {
+        const aliasNorm = normalizeCityString(alias);
+        if (qRaw.includes(alias.toLowerCase()) || (aliasNorm.length >= 4 && qNorm.includes(aliasNorm))) {
+          return city;
+        }
+      }
+    }
+  }
+  return null;
+}
 
 /** Terrain-based threshold modifiers */
 export const TERRAIN_MODIFIERS = {
