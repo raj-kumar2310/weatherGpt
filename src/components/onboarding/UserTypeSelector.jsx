@@ -57,11 +57,25 @@ export function UserTypeSelector() {
   const [selected, setSelected] = useState(null);
   const [confirming, setConfirming] = useState(false);
 
+  const setSelectedActivity = useAppStore((s) => s.setSelectedActivity);
+
   const handleContinue = async () => {
     if (!selected) return;
     setConfirming(true);
     await new Promise((r) => setTimeout(r, 600));
+    
     setUserType(selected);
+    
+    // Auto-select relevant activity based on chosen persona
+    const activityMap = {
+      farmer: 'farming',
+      fisherman: 'fishing',
+      traveller: 'travel',
+      event_organizer: 'outdoor_event',
+      common_user: 'bike_ride',
+    };
+    setSelectedActivity(activityMap[selected]);
+    
     setScreen('activity_selection');
   };
 
