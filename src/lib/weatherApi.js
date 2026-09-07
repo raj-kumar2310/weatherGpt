@@ -92,53 +92,6 @@ function readStaleCache(key) {
   }
 }
 
-const LOCAL_KNOWN_CITIES = [
-  { name: 'Palani', lat: 10.4500, lon: 77.5200, state: 'Tamil Nadu', country: 'IN', zone: 'Palani Hills Foothills', terrain: 'hills' },
-  { name: 'Coimbatore', lat: 11.0168, lon: 76.9558, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore Basin', terrain: 'plains' },
-  { name: 'Kuniyamuthur', lat: 10.9631, lon: 76.9612, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore South', terrain: 'plains' },
-  { name: 'Ooty', lat: 11.4102, lon: 76.6950, state: 'Tamil Nadu', country: 'IN', zone: 'Nilgiris Belt', terrain: 'hills' },
-  { name: 'Valparai', lat: 10.3270, lon: 76.9590, state: 'Tamil Nadu', country: 'IN', zone: 'Anamalai Range', terrain: 'hills' },
-  { name: 'Chennai', lat: 13.0827, lon: 80.2707, state: 'Tamil Nadu', country: 'IN', zone: 'Chennai Coast', terrain: 'coastal' },
-  { name: 'Madurai', lat: 9.9252, lon: 78.1198, state: 'Tamil Nadu', country: 'IN', zone: 'Vaigai Basin', terrain: 'plains' },
-  { name: 'Salem', lat: 11.6643, lon: 78.1460, state: 'Tamil Nadu', country: 'IN', zone: 'Salem Plateau', terrain: 'plains' },
-  { name: 'Trichy', lat: 10.7905, lon: 78.7047, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Delta', terrain: 'plains' },
-  { name: 'Kodaikanal', lat: 10.2381, lon: 77.4892, state: 'Tamil Nadu', country: 'IN', zone: 'Palani Hills', terrain: 'hills' },
-  { name: 'Dindigul', lat: 10.3673, lon: 77.9803, state: 'Tamil Nadu', country: 'IN', zone: 'Dindigul Basin', terrain: 'plains' },
-  { name: 'Pollachi', lat: 10.6583, lon: 77.0084, state: 'Tamil Nadu', country: 'IN', zone: 'Anamalai Foothills', terrain: 'plains' },
-  { name: 'Mettupalayam', lat: 11.2995, lon: 76.9455, state: 'Tamil Nadu', country: 'IN', zone: 'Nilgiri Foothills', terrain: 'plains' },
-  { name: 'Saravanampatti', lat: 11.0805, lon: 76.9947, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore North', terrain: 'plains' },
-  { name: 'Singanallur', lat: 10.9984, lon: 77.0264, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore East', terrain: 'plains' },
-  { name: 'Sulur', lat: 11.0253, lon: 77.1264, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore East', terrain: 'plains' },
-  { name: 'Tiruppur', lat: 11.1085, lon: 77.3411, state: 'Tamil Nadu', country: 'IN', zone: 'Kongu Region', terrain: 'plains' },
-  { name: 'Erode', lat: 11.3410, lon: 77.7172, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Basin', terrain: 'plains' },
-  { name: 'Thanjavur', lat: 10.7870, lon: 79.1378, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Delta', terrain: 'plains' },
-  { name: 'Rameswaram', lat: 9.2876, lon: 79.3129, state: 'Tamil Nadu', country: 'IN', zone: 'Pamban Island', terrain: 'coastal' },
-  { name: 'Kumbakonam', lat: 10.9602, lon: 79.3845, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Delta', terrain: 'plains' },
-  { name: 'Karur', lat: 10.9601, lon: 78.0766, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Plains', terrain: 'plains' },
-  { name: 'Namakkal', lat: 11.2189, lon: 78.1674, state: 'Tamil Nadu', country: 'IN', zone: 'Namakkal Belt', terrain: 'plains' },
-  { name: 'Tirunelveli', lat: 8.7139, lon: 77.7567, state: 'Tamil Nadu', country: 'IN', zone: 'Thamirabarani Basin', terrain: 'plains' },
-  { name: 'Thoothukudi', lat: 8.7642, lon: 78.1348, state: 'Tamil Nadu', country: 'IN', zone: 'Coromandel Coast', terrain: 'coastal' },
-  { name: 'Tuticorin', lat: 8.7642, lon: 78.1348, state: 'Tamil Nadu', country: 'IN', zone: 'Coromandel Coast', terrain: 'coastal' },
-  { name: 'Kanyakumari', lat: 8.0883, lon: 77.5385, state: 'Tamil Nadu', country: 'IN', zone: 'Cape Comorin', terrain: 'coastal' },
-  { name: 'Nagercoil', lat: 8.1833, lon: 77.4119, state: 'Tamil Nadu', country: 'IN', zone: 'Southern Coast', terrain: 'coastal' },
-  { name: 'Hosur', lat: 12.7409, lon: 77.8253, state: 'Tamil Nadu', country: 'IN', zone: 'Deccan Plateau', terrain: 'plains' },
-  { name: 'Vellore', lat: 12.9165, lon: 79.1325, state: 'Tamil Nadu', country: 'IN', zone: 'Palar Basin', terrain: 'plains' },
-  { name: 'Kanchipuram', lat: 12.8342, lon: 79.7036, state: 'Tamil Nadu', country: 'IN', zone: 'Temple Town', terrain: 'plains' },
-  { name: 'Cuddalore', lat: 11.7480, lon: 79.7714, state: 'Tamil Nadu', country: 'IN', zone: 'Coromandel Coast', terrain: 'coastal' },
-  { name: 'Villupuram', lat: 11.9401, lon: 79.4861, state: 'Tamil Nadu', country: 'IN', zone: 'Interior Plain', terrain: 'plains' },
-  { name: 'Pondicherry', lat: 11.9416, lon: 79.8083, state: 'Puducherry', country: 'IN', zone: 'Pondicherry Coast', terrain: 'coastal' },
-  { name: 'Puducherry', lat: 11.9416, lon: 79.8083, state: 'Puducherry', country: 'IN', zone: 'Pondicherry Coast', terrain: 'coastal' },
-  { name: 'Nagapattinam', lat: 10.7656, lon: 79.8424, state: 'Tamil Nadu', country: 'IN', zone: 'Delta Coast', terrain: 'coastal' },
-  { name: 'Tenkasi', lat: 8.9593, lon: 77.3148, state: 'Tamil Nadu', country: 'IN', zone: 'Ghats Border', terrain: 'hills' },
-  { name: 'Theni', lat: 10.0104, lon: 77.4768, state: 'Tamil Nadu', country: 'IN', zone: 'Cardamom Foothills', terrain: 'hills' },
-  { name: 'Virudhunagar', lat: 9.5680, lon: 77.9624, state: 'Tamil Nadu', country: 'IN', zone: 'Southern Plain', terrain: 'plains' },
-  { name: 'Ramanathapuram', lat: 9.3639, lon: 78.8395, state: 'Tamil Nadu', country: 'IN', zone: 'Sethu Coast', terrain: 'coastal' },
-  { name: 'Sivagangai', lat: 9.8433, lon: 78.4809, state: 'Tamil Nadu', country: 'IN', zone: 'Vaigai Region', terrain: 'plains' },
-  { name: 'Pudukkottai', lat: 10.3833, lon: 78.8000, state: 'Tamil Nadu', country: 'IN', zone: 'Interior Plain', terrain: 'plains' },
-  { name: 'Coonoor', lat: 11.3530, lon: 76.7959, state: 'Tamil Nadu', country: 'IN', zone: 'Nilgiri Hills', terrain: 'hills' },
-  { name: 'Yercaud', lat: 11.7753, lon: 78.2093, state: 'Tamil Nadu', country: 'IN', zone: 'Shevaroy Hills', terrain: 'hills' },
-];
-
 // ------------- API helpers -------------
 
 async function apiFetch(url) {
@@ -187,16 +140,23 @@ export async function searchCities(query) {
   if (!query || query.trim().length < 1) return [];
   const qClean = query.trim().toLowerCase();
 
-  // Instant offline match
-  const localMatches = LOCAL_KNOWN_CITIES.filter((c) =>
+  // Instant offline match from local dataset
+  const localMatches = TAMIL_NADU_CITIES.filter((c) =>
     c.name.toLowerCase().includes(qClean)
   );
+  if (localMatches.length > 0) {
+    return localMatches.map((c) => ({
+      ...c,
+      state: c.state || 'Tamil Nadu',
+      country: c.country || 'IN',
+    }));
+  }
 
   const cacheKey = `geo_${qClean}`;
   const cached = readCache(cacheKey);
   if (cached?.data?.length) return cached.data;
 
-  if (API_KEY === 'demo') return localMatches.length ? localMatches : [{ name: query, lat: 10.45, lon: 77.52, state: 'Tamil Nadu', country: 'IN' }];
+  if (API_KEY === 'demo') return [{ name: query, lat: 10.45, lon: 77.52, state: 'Tamil Nadu', country: 'IN' }];
 
   try {
     const data = await apiFetch(
@@ -215,7 +175,7 @@ export async function searchCities(query) {
     return osmResults;
   }
 
-  return localMatches;
+  return [];
 }
 
 /**

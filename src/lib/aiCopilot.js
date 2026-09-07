@@ -11,6 +11,43 @@ import { searchCities, fetchForecast, fetchCurrentWeather, normalizeCurrentWeath
 const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 /**
+ * Call Google Gemini REST API with sequential model fallbacks to handle deprecations or 404s
+ */
+async function callGeminiAPI(prompt) {
+  if (!GEMINI_API_KEY) return null;
+  const models = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-pro',
+  ];
+
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      }
+    } catch {
+      // try next model
+    }
+  }
+  return null;
+}
+
+/**
  * Quick prompt suggestions for the chat interface
  */
 export const SUGGESTION_PROMPTS = [
@@ -95,25 +132,8 @@ function parseCityFallback(query) {
       return city;
     }
   }
-  const knownPlaces = [
-    { name: 'Kuniyamuthur', lat: 10.9631, lon: 76.9612, zone: 'Coimbatore South', terrain: 'plains' },
-    { name: 'Pollachi', lat: 10.6583, lon: 77.0084, zone: 'Anamalai Foothills', terrain: 'plains' },
-    { name: 'Mettupalayam', lat: 11.2995, lon: 76.9455, zone: 'Nilgiri Foothills', terrain: 'plains' },
-    { name: 'Saravanampatti', lat: 11.0805, lon: 76.9947, zone: 'Coimbatore North', terrain: 'plains' },
-    { name: 'Singanallur', lat: 10.9984, lon: 77.0264, zone: 'Coimbatore East', terrain: 'plains' },
-    { name: 'Sulur', lat: 11.0253, lon: 77.1264, zone: 'Coimbatore East', terrain: 'plains' },
-    { name: 'Tiruppur', lat: 11.1085, lon: 77.3411, zone: 'Kongu Region', terrain: 'plains' },
-    { name: 'Erode', lat: 11.3410, lon: 77.7172, zone: 'Kaveri Basin', terrain: 'plains' },
-    { name: 'Tanjavur', lat: 10.7870, lon: 79.1378, zone: 'Kaveri Delta', terrain: 'plains' },
-    { name: 'Thanjavur', lat: 10.7870, lon: 79.1378, zone: 'Kaveri Delta', terrain: 'plains' },
-    { name: 'Rameswaram', lat: 9.2876, lon: 79.3129, zone: 'Pamban Island', terrain: 'coastal' },
-  ];
-  for (const p of knownPlaces) {
-    if (q.includes(p.name.toLowerCase())) {
-      return p;
-    }
-  }
-  return TAMIL_NADU_CITIES[0]; // Default: Coimbatore
+  // Default to Coimbatore if no match
+  return TAMIL_NADU_CITIES.find((c) => c.name === 'Coimbatore') || TAMIL_NADU_CITIES[0];
 }
 
 /**
