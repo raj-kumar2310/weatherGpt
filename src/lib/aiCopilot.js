@@ -215,18 +215,21 @@ Please format your response into 4 distinct markdown sections:
 async function fetchGeminiReasoning(query, city, activityName, overall, timeWindow, language = 'en') {
   if (!GEMINI_API_KEY) return null;
   try {
-    const langPrompt = language === 'ta' ? 'LANGUAGE INSTRUCTION: Please provide the safety recommendation in clear Tamil language.' : '';
-    const prompt = `You are WeatherAction AI Copilot, a hyperlocal micro-zone weather safety expert for Tamil Nadu, India.
+    const langPrompt = language === 'ta' ? 'LANGUAGE INSTRUCTION: Please provide the safety recommendation in clear, natural conversational Tamil language.' : '';
+    const prompt = `You are WeatherAction Assistant, a smart decision-making weather assistant for Tamil Nadu, India.
 User query: "${query}"
 City/Location: ${city.name} (${city.zone}, ${city.terrain} terrain)
-Activity: ${activityName}
+Activity/Topic: ${activityName}
 Time Target: ${timeWindow || 'Requested Time'}
 Calculated Risk Level: ${overall.riskLevel} (Score: ${overall.totalScore}/100)
 Weather Factors: Rain Risk ${overall.factors.rain}%, Wind Speed ${overall.factors.wind} km/h, Humidity ${overall.factors.humidity}%
 
 ${langPrompt}
 
-Provide a concise, professional 2-3 sentence safety recommendation with markdown bold highlights tailored specifically to the activity, location (${city.name}), and time. Keep it actionable and empathetic.`;
+Please answer the user's question directly and conversationally like ChatGPT:
+1. Provide a warm, direct 2-3 sentence answer specifically addressing their question (e.g. recommending 2-3 specific popular local places in ${city.name} like VOC Park or Singanallur Lake if they asked for places/picnic, or giving direct vehicle safety advice if they asked about travel).
+2. Explicitly state the weather forecast (temperature, rain probability %, wind speed).
+3. Use markdown bold highlights for key places, numbers, and times. Keep it friendly, empathetic, and natural.`;
 
     return await callGeminiAPI(prompt);
   } catch {
@@ -320,15 +323,22 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
       const rainProb = targetBlock.rainProbability ?? currentWeatherData?.rainProbability ?? 10;
       const timeLabel = isTomorrow ? 'Tomorrow' : 'Currently';
 
-      if (isTomorrow) {
-        generalText = `${timeLabel} in **${cityObj.name}**, the rain probability is **${rainProb}%** with **${desc}** 🌤️.\n\n` +
-          `• 🌧️ Rain Probability: **${rainProb}%**\n` +
+      if (rainProb === 0) {
+        generalText = `Good news! **No rain expected** in **${cityObj.name}** ${isTomorrow ? 'tomorrow' : 'today'} (**0% rain probability**). Weather will be pleasant with **${desc}** (${temp}°C) 🌤️.\n\n` +
+          `• 🌧️ Rain Chance: **0%** (No umbrella needed!)\n` +
+          `• 🌡️ Temperature: **${temp}°C** (Feels like **${feelsLike}°C**)\n` +
+          `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
+          `• 💧 Humidity: **${humidity}%**`;
+      } else if (rainProb < 40) {
+        generalText = `There is a **low chance of rain (${rainProb}%)** in **${cityObj.name}** ${isTomorrow ? 'tomorrow' : 'today'}. Weather will be mostly pleasant with **${desc}** (${temp}°C) 🌤️.\n\n` +
+          `• 🌧️ Rain Chance: **${rainProb}%**\n` +
           `• 🌡️ Temperature: **${temp}°C** (Feels like **${feelsLike}°C**)\n` +
           `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
           `• 💧 Humidity: **${humidity}%**`;
       } else {
-        generalText = `The current temperature in **${cityObj.name}** is **${temp}°C** (Feels like **${feelsLike}°C**) with **${desc}** 🌤️.\n\n` +
-          `• 🌧️ Rain Probability: **${rainProb}%**\n` +
+        generalText = `Yes! **Rain is expected (${rainProb}% probability)** in **${cityObj.name}** ${isTomorrow ? 'tomorrow' : 'today'}. Please carry an umbrella or raincoat! ☔\n\n` +
+          `• 🌧️ Rain Chance: **${rainProb}%**\n` +
+          `• 🌡️ Temperature: **${temp}°C** (Feels like **${feelsLike}°C**)\n` +
           `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
           `• 💧 Humidity: **${humidity}%**`;
       }
@@ -378,21 +388,7 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
 
   let reasoningText = await fetchGeminiReasoning(query, cityObj, activityName, overall, timeWindow, language);
 
-  if (!reasoningText) {
-    if (overall.riskLevel === 'SAFE') {
-      reasoningText = `Based on high-resolution radar analysis for **${cityObj.name} (${cityObj.zone})**${
-        timeWindow ? ` around **${timeWindow}**` : ''
-      }, weather conditions are favorable for **${activityName}**. Rain probability is low (${
-        specificBlockFactor.rain
-      }%), wind speeds are mild (${specificBlockFactor.wind} km/h), and visibility is clear.`;
-    } else if (overall.riskLevel === 'MODERATE') {
-      reasoningText = `Caution is advised for **${activityName}** in **${cityObj.name}**. Our micro-zone model detected moderate weather factors (Rain risk: ${specificBlockFactor.rain}%, Wind speed: ${specificBlockFactor.wind} km/h). Keep protective gear handy.`;
-    } else {
-      reasoningText = `⚠️ High Risk Alert for **${activityName}** in **${cityObj.name}**. Heavy weather risks detected (Precipitation risk: ${specificBlockFactor.rain}%, Wind gusts: ${specificBlockFactor.wind} km/h). We recommend postponing outdoor activities.`;
-    }
-  }
-
-  let optimalWindowText = '05:00 AM – 08:30 AM';
+  let optimalWindowText = '05:30 AM – 08:30 AM';
   if (optimalWindow && optimalWindow.start && optimalWindow.end) {
     try {
       optimalWindowText = `${new Date(optimalWindow.start).toLocaleTimeString('en-IN', {
@@ -400,6 +396,35 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
         minute: '2-digit',
       })} – ${new Date(optimalWindow.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
     } catch {}
+  }
+
+  if (!reasoningText) {
+    const temp = forecastBlocks[0]?.temp ? Math.round(forecastBlocks[0].temp) : 26;
+    if (activityId === 'picnic') {
+      reasoningText = `For a **Picnic in ${cityObj.name}** based on current weather (${temp}°C, rain chance ${specificBlockFactor.rain}%):\n\n` +
+        `• 🌿 **Recommended Places**: **VOC Park & Botanical Garden**, **Singanallur Lake**, or **Siruvani Foothills**.\n` +
+        `• ⛅ **Weather Assessment**: ${overall.riskLevel === 'SAFE' ? 'Favorable conditions with low rain risk!' : `Rain chance is low (${specificBlockFactor.rain}%) with breezy winds at ${specificBlockFactor.wind} km/h.`}\n` +
+        `• ⏱️ **Best Window**: **${optimalWindowText}** for ideal outdoor comfort.`;
+    } else if (activityId === 'travel') {
+      reasoningText = `For **Travel / Drive in ${cityObj.name}**:\n\n` +
+        `• 🚗 **Route Outlook**: ${overall.riskLevel === 'SAFE' ? 'Clear roads and good visibility expected.' : `Moderate winds (${specificBlockFactor.wind} km/h) and rain risk (${specificBlockFactor.rain}%). Drive carefully on ghat stretches.`}\n` +
+        `• 💡 **Vehicle Advice**: ${specificBlockFactor.rain > 40 || specificBlockFactor.wind > 30 ? 'Car 🚗 is recommended over two-wheelers for safety.' : 'Bike 🏍️ or Car 🚗 are both suitable.'}\n` +
+        `• ⏱️ **Best Window**: **${optimalWindowText}**.`;
+    } else if (activityId === 'farming') {
+      reasoningText = `For **Farming & Crop Operations in ${cityObj.name}**:\n\n` +
+        `• 🌾 **Spraying & Irrigation**: ${overall.riskLevel === 'SAFE' ? 'Low rain probability. Excellent time for field spraying.' : `Rain chance is ${specificBlockFactor.rain}%. Suspend pesticide spraying after 2 PM to avoid wind drift.`}\n` +
+        `• ⏱️ **Recommended Window**: **${optimalWindowText}**.`;
+    } else {
+      if (overall.riskLevel === 'SAFE') {
+        reasoningText = `Weather conditions in **${cityObj.name} (${cityObj.zone})** are **favorable for ${activityName}**! Rain probability is low (${specificBlockFactor.rain}%), wind speeds are mild (${specificBlockFactor.wind} km/h), and visibility is clear.\n\n` +
+          `• ⏱️ **Optimal Window**: **${optimalWindowText}**.`;
+      } else if (overall.riskLevel === 'MODERATE') {
+        reasoningText = `Caution is advised for **${activityName}** in **${cityObj.name}**. Rain chance is **${specificBlockFactor.rain}%** with wind speed at **${specificBlockFactor.wind} km/h**. Keep protective gear handy.\n\n` +
+          `• ⏱️ **Optimal Window**: **${optimalWindowText}**.`;
+      } else {
+        reasoningText = `⚠️ **High Risk Alert** for **${activityName}** in **${cityObj.name}**. Rain risk is high (**${specificBlockFactor.rain}%**) with wind gusts at **${specificBlockFactor.wind} km/h**. We recommend postponing outdoor plans.`;
+      }
+    }
   }
 
   return {
