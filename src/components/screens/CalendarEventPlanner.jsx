@@ -21,6 +21,7 @@ export function CalendarEventPlanner() {
   const [selectedEventType, setSelectedEventType] = useState('college');
   const [eventTitle, setEventTitle] = useState('College Commute');
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+  const [customDate, setCustomDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('08:30');
   const [endTime, setEndTime] = useState('16:30');
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -118,11 +119,30 @@ export function CalendarEventPlanner() {
         </div>
       </div>
 
-      {/* 2. Interactive Date Picker Grid (14-Day Forecast Window) */}
+      {/* 2. Interactive Date Picker & Custom Date Input */}
       <div className="space-y-2">
-        <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider block">
-          Event Date & Weather Outlook
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider block">
+            Event Date & Weather Outlook
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400">Pick Any Date:</span>
+            <input
+              type="date"
+              value={customDate}
+              onChange={(e) => {
+                setCustomDate(e.target.value);
+                const picked = new Date(e.target.value);
+                const today = new Date();
+                const diffTime = picked - today;
+                const diffDays = Math.max(0, Math.min(6, Math.floor(diffTime / (1000 * 60 * 60 * 24))));
+                setSelectedDayIdx(diffDays);
+              }}
+              className="px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-400"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-7 gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
           {Array.from({ length: 7 }).map((_, idx) => {
             const d = new Date();
@@ -138,7 +158,12 @@ export function CalendarEventPlanner() {
             return (
               <button
                 key={idx}
-                onClick={() => setSelectedDayIdx(idx)}
+                onClick={() => {
+                  setSelectedDayIdx(idx);
+                  const picked = new Date();
+                  picked.setDate(picked.getDate() + idx);
+                  setCustomDate(picked.toISOString().split('T')[0]);
+                }}
                 className={`p-2.5 rounded-2xl border text-center transition-all ${
                   isSelected
                     ? 'bg-sky-500 text-white border-sky-500 shadow-md scale-105 font-bold'
