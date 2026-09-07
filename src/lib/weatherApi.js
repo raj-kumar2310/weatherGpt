@@ -92,12 +92,43 @@ function readStaleCache(key) {
   }
 }
 
+const LOCAL_KNOWN_CITIES = [
+  { name: 'Coimbatore', lat: 11.0168, lon: 76.9558, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore Basin', terrain: 'plains' },
+  { name: 'Kuniyamuthur', lat: 10.9631, lon: 76.9612, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore South', terrain: 'plains' },
+  { name: 'Ooty', lat: 11.4102, lon: 76.6950, state: 'Tamil Nadu', country: 'IN', zone: 'Nilgiris Belt', terrain: 'hills' },
+  { name: 'Valparai', lat: 10.3270, lon: 76.9590, state: 'Tamil Nadu', country: 'IN', zone: 'Anamalai Range', terrain: 'hills' },
+  { name: 'Chennai', lat: 13.0827, lon: 80.2707, state: 'Tamil Nadu', country: 'IN', zone: 'Chennai Coast', terrain: 'coastal' },
+  { name: 'Madurai', lat: 9.9252, lon: 78.1198, state: 'Tamil Nadu', country: 'IN', zone: 'Vaigai Basin', terrain: 'plains' },
+  { name: 'Salem', lat: 11.6643, lon: 78.1460, state: 'Tamil Nadu', country: 'IN', zone: 'Salem Plateau', terrain: 'plains' },
+  { name: 'Trichy', lat: 10.7905, lon: 78.7047, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Delta', terrain: 'plains' },
+  { name: 'Kodaikanal', lat: 10.2381, lon: 77.4892, state: 'Tamil Nadu', country: 'IN', zone: 'Palani Hills', terrain: 'hills' },
+  { name: 'Pollachi', lat: 10.6583, lon: 77.0084, state: 'Tamil Nadu', country: 'IN', zone: 'Anamalai Foothills', terrain: 'plains' },
+  { name: 'Mettupalayam', lat: 11.2995, lon: 76.9455, state: 'Tamil Nadu', country: 'IN', zone: 'Nilgiri Foothills', terrain: 'plains' },
+  { name: 'Saravanampatti', lat: 11.0805, lon: 76.9947, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore North', terrain: 'plains' },
+  { name: 'Singanallur', lat: 10.9984, lon: 77.0264, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore East', terrain: 'plains' },
+  { name: 'Sulur', lat: 11.0253, lon: 77.1264, state: 'Tamil Nadu', country: 'IN', zone: 'Coimbatore East', terrain: 'plains' },
+  { name: 'Tiruppur', lat: 11.1085, lon: 77.3411, state: 'Tamil Nadu', country: 'IN', zone: 'Kongu Region', terrain: 'plains' },
+  { name: 'Erode', lat: 11.3410, lon: 77.7172, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Basin', terrain: 'plains' },
+  { name: 'Thanjavur', lat: 10.7870, lon: 79.1378, state: 'Tamil Nadu', country: 'IN', zone: 'Kaveri Delta', terrain: 'plains' },
+  { name: 'Rameswaram', lat: 9.2876, lon: 79.3129, state: 'Tamil Nadu', country: 'IN', zone: 'Pamban Island', terrain: 'coastal' },
+];
+
 // ------------- API helpers -------------
 
 async function apiFetch(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
-  return res.json();
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // Catch HTTP 429 Too Many Requests silently
+      if (res.status === 429) {
+        throw new Error('RATE_LIMIT');
+      }
+      throw new Error(`API error ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    throw err;
+  }
 }
 
 // ------------- Public API -------------
@@ -107,26 +138,34 @@ async function apiFetch(url) {
  * @returns {Promise<Array>} Array of { name, lat, lon, country, state }
  */
 export async function searchCities(query) {
-  if (!query || query.length < 2) return [];
-  if (API_KEY === 'demo') {
-    // Return Tamil Nadu cities matching the query
-    return TAMIL_NADU_CITIES.filter((c) =>
-      c.name.toLowerCase().includes(query.toLowerCase())
-    ).map((c) => ({ name: c.name, lat: c.lat, lon: c.lon, country: 'IN', state: 'Tamil Nadu', zone: c.zone, terrain: c.terrain }));
-  }
-  const cacheKey = `geo_${query.toLowerCase()}`;
+  if (!query || query.trim().length < 1) return [];
+  const qClean = query.trim().toLowerCase();
+
+  // Instant offline match
+  const localMatches = LOCAL_KNOWN_CITIES.filter((c) =>
+    c.name.toLowerCase().includes(qClean)
+  );
+
+  const cacheKey = `geo_${qClean}`;
   const cached = readCache(cacheKey);
-  if (cached) return cached.data;
+  if (cached?.data?.length) return cached.data;
+
+  if (API_KEY === 'demo') return localMatches;
 
   try {
     const data = await apiFetch(
       `${BASE_URL}/geo/1.0/direct?q=${encodeURIComponent(query)},IN&limit=5&appid=${API_KEY}`
     );
-    writeCache(cacheKey, data);
-    return data;
+    if (Array.isArray(data) && data.length > 0) {
+      writeCache(cacheKey, data);
+      return data;
+    }
   } catch {
-    return [];
+    const stale = readStaleCache(cacheKey);
+    if (stale?.data?.length) return stale.data;
   }
+
+  return localMatches;
 }
 
 /**

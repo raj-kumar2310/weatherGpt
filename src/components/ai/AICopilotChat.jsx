@@ -236,14 +236,26 @@ export function AICopilotChat() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Google Maps Style Location Search
-  const handleMapSearchChange = async (val) => {
+  const debounceRef = useRef(null);
+
+  // Google Maps Style Location Search (with instant offline matching + 350ms debounce)
+  const handleMapSearchChange = (val) => {
     setMapSearchQuery(val);
-    if (val.trim().length >= 2) {
-      setIsSearching(true);
-      const results = await searchCities(val);
-      setSearchResults(results || []);
-      setIsSearching(false);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (val.trim().length >= 1) {
+      // 1. Instant local search first (0ms delay)
+      searchCities(val.trim()).then((results) => {
+        if (results?.length) setSearchResults(results);
+      });
+
+      // 2. Debounced API search after 350ms pause
+      debounceRef.current = setTimeout(async () => {
+        setIsSearching(true);
+        const results = await searchCities(val.trim());
+        setSearchResults(results || []);
+        setIsSearching(false);
+      }, 350);
     } else {
       setSearchResults([]);
     }
