@@ -6,7 +6,7 @@
 
 import { ACTIVITIES, TAMIL_NADU_CITIES } from './activityConfig';
 import { evaluateTimeline, getRiskDisplay } from './riskEngine';
-import { searchCities, fetchForecast } from './weatherApi';
+import { searchCities, fetchForecast, fetchCurrentWeather, normalizeCurrentWeather } from './weatherApi';
 
 const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
@@ -14,53 +14,74 @@ const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
  * Quick prompt suggestions for the chat interface
  */
 export const SUGGESTION_PROMPTS = [
+  { text: 'What is the current temperature in Coimbatore?', icon: '🌡️' },
   { text: 'Can I go for a bike ride to Ooty tomorrow at 7 AM?', icon: '🚴' },
   { text: 'Is it safe to spray pesticides in Tanjavur paddy field today?', icon: '🌾' },
-  { text: 'We are planning an outdoor evening wedding in Coimbatore.', icon: '🎪' },
   { text: 'Should I drive through Valparai ghat road this afternoon?', icon: '🚗' },
   { text: 'Is sea condition safe for boat fishing in Rameswaram?', icon: '🎣' },
 ];
 
 /**
- * Fallback activity parser using regex
+ * Fallback intent classification & parsing
  */
-function parseActivityFallback(query) {
+function parseIntentFallback(query) {
   const q = query.toLowerCase();
-  if (
-    q.includes('run') ||
-    q.includes('jog') ||
-    q.includes('walk') ||
-    q.includes('marathon') ||
-    q.includes('sprint') ||
-    q.includes('bike') ||
-    q.includes('cycling') ||
-    q.includes('ride') ||
-    q.includes('cycle') ||
-    q.includes('motorcycle')
-  ) {
-    const isRun = q.includes('run') || q.includes('jog') || q.includes('marathon') || q.includes('walk');
+
+  const activityKeywords = [
+    'run', 'jog', 'walk', 'marathon', 'sprint', 'bike', 'cycling', 'ride', 'cycle',
+    'picnic', 'park', 'farm', 'spray', 'crop', 'pesticide', 'travel', 'drive', 'ghat',
+    'event', 'wedding', 'fish', 'boat', 'sea', 'ocean'
+  ];
+  const hasActivity = activityKeywords.some((k) => q.includes(k));
+  const city = parseCityFallback(query);
+
+  if (!hasActivity) {
     return {
-      activityId: 'bike_ride',
-      activityName: isRun ? 'Running / Jogging' : 'Bike Ride',
-      activityIcon: isRun ? '🏃' : '🚴',
+      isActivityQuery: false,
+      locationName: city.name,
+      city,
     };
   }
-  if (q.includes('picnic') || q.includes('park') || q.includes('lunch') || q.includes('outing') || q.includes('bbq')) {
-    return { activityId: 'picnic', activityName: 'Picnic', activityIcon: '🧺' };
+
+  let activityId = 'bike_ride';
+  let activityName = 'Outdoor Activity';
+  let activityIcon = '🏃';
+
+  if (q.includes('run') || q.includes('jog') || q.includes('walk') || q.includes('marathon') || q.includes('sprint') || q.includes('bike') || q.includes('cycling') || q.includes('ride') || q.includes('cycle')) {
+    const isRun = q.includes('run') || q.includes('jog') || q.includes('marathon') || q.includes('walk');
+    activityId = 'bike_ride';
+    activityName = isRun ? 'Running / Jogging' : 'Bike Ride';
+    activityIcon = isRun ? '🏃' : '🚴';
+  } else if (q.includes('picnic') || q.includes('park') || q.includes('lunch') || q.includes('outing')) {
+    activityId = 'picnic';
+    activityName = 'Picnic';
+    activityIcon = '🧺';
+  } else if (q.includes('farm') || q.includes('spray') || q.includes('crop') || q.includes('pesticide')) {
+    activityId = 'farming';
+    activityName = 'Farming';
+    activityIcon = '🌾';
+  } else if (q.includes('travel') || q.includes('drive') || q.includes('ghat') || q.includes('road')) {
+    activityId = 'travel';
+    activityName = 'Travel';
+    activityIcon = '🚗';
+  } else if (q.includes('event') || q.includes('wedding') || q.includes('concert') || q.includes('party')) {
+    activityId = 'outdoor_event';
+    activityName = 'Outdoor Event';
+    activityIcon = '🎪';
+  } else if (q.includes('fish') || q.includes('boat') || q.includes('sea') || q.includes('ocean')) {
+    activityId = 'fishing';
+    activityName = 'Fishing';
+    activityIcon = '🎣';
   }
-  if (q.includes('farm') || q.includes('spray') || q.includes('crop') || q.includes('pesticide') || q.includes('field') || q.includes('harvest')) {
-    return { activityId: 'farming', activityName: 'Farming', activityIcon: '🌾' };
-  }
-  if (q.includes('travel') || q.includes('drive') || q.includes('ghat') || q.includes('road') || q.includes('pass') || q.includes('hill') || q.includes('highway')) {
-    return { activityId: 'travel', activityName: 'Travel', activityIcon: '🚗' };
-  }
-  if (q.includes('event') || q.includes('wedding') || q.includes('concert') || q.includes('stage') || q.includes('party') || q.includes('tent')) {
-    return { activityId: 'outdoor_event', activityName: 'Outdoor Event', activityIcon: '🎪' };
-  }
-  if (q.includes('fish') || q.includes('boat') || q.includes('sea') || q.includes('ocean') || q.includes('coastal') || q.includes('catch')) {
-    return { activityId: 'fishing', activityName: 'Fishing', activityIcon: '🎣' };
-  }
-  return { activityId: 'bike_ride', activityName: 'Outdoor Activity', activityIcon: '🏃' };
+
+  return {
+    isActivityQuery: true,
+    locationName: city.name,
+    activityId,
+    activityName,
+    activityIcon,
+    city,
+  };
 }
 
 /**
@@ -95,18 +116,19 @@ function parseCityFallback(query) {
 }
 
 /**
- * Call Gemini AI to extract intent: location, activity, time window
+ * Call Gemini AI to extract intent: isActivityQuery, location, activity, time window
  */
 async function extractIntentWithGemini(query) {
   if (!GEMINI_API_KEY) return null;
   try {
-    const prompt = `Analyze this user weather query: "${query}"
+    const prompt = `Analyze this user weather chatbot query: "${query}"
 Extract intent as JSON with structure:
 {
-  "locationName": "location or city mentioned (e.g. Kuniyamuthur, Ooty, Tanjavur, Pollachi, Madurai)",
-  "activityId": "one of: bike_ride, picnic, farming, travel, outdoor_event, fishing",
-  "activityName": "specific action name (e.g. Running, Morning Walk, Bike Ride, Pesticide Spray, Ghat Drive, Sea Fishing)",
-  "activityIcon": "relevant emoji (e.g. 🏃, 🚴, 🌾, 🚗, 🧺, 🎣, 🎪)",
+  "isActivityQuery": boolean (Set to true ONLY if user asks about planning/doing a specific outdoor activity or safety for an activity like running, cycling, trip, farming, fishing, drive, event. Set to false if user asks for temperature, current weather, greetings, climate, or general info),
+  "locationName": "location or city mentioned (e.g. Coimbatore, Kuniyamuthur, Ooty, Tanjavur, Pollachi, Madurai)",
+  "activityId": "one of: bike_ride, picnic, farming, travel, outdoor_event, fishing or null",
+  "activityName": "specific action name (e.g. Running, Morning Walk, Bike Ride, Pesticide Spray, Ghat Drive, Sea Fishing) or null",
+  "activityIcon": "relevant emoji (e.g. 🏃, 🚴, 🌾, 🚗, 🧺, 🎣, 🎪) or null",
   "timeWindow": "time requested if specified (e.g. 5:00 AM, 7:00 AM, Afternoon) or null"
 }
 Return raw JSON ONLY. No markdown wrapper.`;
@@ -130,7 +152,48 @@ Return raw JSON ONLY. No markdown wrapper.`;
 }
 
 /**
- * Call Google Gemini API for generative weather advice
+ * Call Gemini API to answer general conversational weather queries (e.g. "coimbatore tempratore")
+ */
+async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastData) {
+  if (!GEMINI_API_KEY) return null;
+  try {
+    const temp = currentWeatherData?.temp || forecastData?.[0]?.temp || 27;
+    const feelsLike = currentWeatherData?.feelsLike || forecastData?.[0]?.feelsLike || 29;
+    const humidity = currentWeatherData?.humidity || forecastData?.[0]?.humidity || 68;
+    const windSpeed = currentWeatherData?.windSpeed || Math.round(forecastData?.[0]?.windSpeed || 12);
+    const weatherDesc = currentWeatherData?.weatherDesc || forecastData?.[0]?.weatherDesc || 'scattered clouds';
+    const rainProb = forecastData?.[0]?.rainProbability || 10;
+
+    const prompt = `You are WeatherAction AI Assistant, a conversational weather chatbot for Tamil Nadu, India.
+User query: "${query}"
+City/Location: ${cityObj.name} (${cityObj.zone})
+Current Weather Stats:
+- Temperature: ${temp}°C (Feels like ${feelsLike}°C)
+- Condition: ${weatherDesc}
+- Rain Chance: ${rainProb}%
+- Wind Speed: ${windSpeed} km/h
+- Humidity: ${humidity}%
+
+Answer the user's question directly and conversationally in 2-3 well-formatted sentences using markdown bold highlights for temperature and key numbers. If they asked for temperature, clearly highlight the temperature. Be helpful, concise, and friendly like ChatGPT.`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call Google Gemini API for generative activity weather safety advice
  */
 async function fetchGeminiReasoning(query, city, activityName, overall, timeWindow) {
   if (!GEMINI_API_KEY) return null;
@@ -168,14 +231,14 @@ Provide a concise, professional 2-3 sentence safety recommendation with markdown
 export async function processAICopilotQuery(query, initialForecastBlocks = [], currentStore = {}) {
   // Step 1: Extract intent with Gemini AI or Fallback
   const geminiIntent = await extractIntentWithGemini(query);
-  const fallbackActivity = parseActivityFallback(query);
-  const fallbackCity = parseCityFallback(query);
+  const fallbackIntent = parseIntentFallback(query);
 
-  const activityId = geminiIntent?.activityId || fallbackActivity.activityId;
-  const activityName = geminiIntent?.activityName || fallbackActivity.activityName;
-  const activityIcon = geminiIntent?.activityIcon || fallbackActivity.activityIcon;
-  const locationName = geminiIntent?.locationName || fallbackCity.name;
-  const timeWindow = geminiIntent?.timeWindow || null;
+  const isActivityQuery = geminiIntent?.isActivityQuery !== undefined 
+    ? geminiIntent.isActivityQuery 
+    : fallbackIntent.isActivityQuery;
+
+  const locationName = geminiIntent?.locationName || fallbackIntent.locationName;
+  const fallbackCity = fallbackIntent.city || parseCityFallback(query);
 
   // Step 2: Resolve Location & Geocode via OpenWeather API
   let cityObj = fallbackCity;
@@ -196,33 +259,65 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
         zone: geo.state ? `${geo.name} (${geo.state})` : `${locationName} Micro-zone`,
         terrain: isHill ? 'hills' : isCoast ? 'coastal' : 'plains',
       };
-    } else {
-      cityObj = {
-        name: locationName,
-        lat: fallbackCity.lat,
-        lon: fallbackCity.lon,
-        zone: `${locationName} Area`,
-        terrain: fallbackCity.terrain || 'plains',
-      };
     }
   } catch {}
 
-  // Step 3: Fetch fresh OpenWeather 5-day forecast for the specific target location
+  // Step 3: Fetch forecast & current weather data for location
   let forecastBlocks = initialForecastBlocks;
+  let currentWeatherData = null;
   try {
-    const freshData = await fetchForecast(cityObj.lat, cityObj.lon);
-    if (freshData?.blocks?.length) {
-      forecastBlocks = freshData.blocks;
-    }
+    const [freshForecast, freshCurrent] = await Promise.all([
+      fetchForecast(cityObj.lat, cityObj.lon),
+      fetchCurrentWeather(cityObj.lat, cityObj.lon),
+    ]);
+    if (freshForecast?.blocks?.length) forecastBlocks = freshForecast.blocks;
+    if (freshCurrent?.data) currentWeatherData = normalizeCurrentWeather(freshCurrent.data);
   } catch {}
 
-  // Step 4: Evaluate Risk for target location and activity
+  // -------------------------------------------------------------
+  // CASE 1: Conversational Weather / Temperature Query (isActivityQuery = false)
+  // -------------------------------------------------------------
+  if (!isActivityQuery) {
+    let generalText = await fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastBlocks);
+
+    if (!generalText) {
+      const temp = currentWeatherData?.temp || forecastBlocks?.[0]?.temp || 27;
+      const feelsLike = currentWeatherData?.feelsLike || forecastBlocks?.[0]?.feelsLike || 29;
+      const desc = currentWeatherData?.weatherDesc || forecastBlocks?.[0]?.weatherDesc || 'clear sky';
+      const humidity = currentWeatherData?.humidity || forecastBlocks?.[0]?.humidity || 68;
+      const windSpeed = currentWeatherData?.windSpeed || Math.round(forecastBlocks?.[0]?.windSpeed || 12);
+      const rainProb = forecastBlocks?.[0]?.rainProbability || 10;
+
+      generalText = `The current temperature in **${cityObj.name}** is **${temp}°C** (Feels like **${feelsLike}°C**) with **${desc}** 🌤️.\n\n` +
+        `• 🌧️ Rain Probability: **${rainProb}%**\n` +
+        `• 💨 Wind Speed: **${windSpeed} km/h**\n` +
+        `• 💧 Humidity: **${humidity}%**`;
+    }
+
+    return {
+      id: `msg-${Date.now()}`,
+      sender: 'ai',
+      text: generalText,
+      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      card: null, // No activity decision card forced!
+      cityObj,
+      forecastBlocks,
+    };
+  }
+
+  // -------------------------------------------------------------
+  // CASE 2: Activity Safety Plan Query (isActivityQuery = true)
+  // -------------------------------------------------------------
+  const activityId = geminiIntent?.activityId || fallbackIntent.activityId || 'bike_ride';
+  const activityName = geminiIntent?.activityName || fallbackIntent.activityName || 'Outdoor Activity';
+  const activityIcon = geminiIntent?.activityIcon || fallbackIntent.activityIcon || '🏃';
+  const timeWindow = geminiIntent?.timeWindow || null;
+
   const terrain = cityObj.terrain || 'plains';
   const riskData = evaluateTimeline(forecastBlocks.slice(0, 12), activityId, terrain);
   const { overall, optimalWindow } = riskData;
   const display = getRiskDisplay(overall.riskLevel);
 
-  // If user requested a specific time (e.g. 5am), extract closest block details
   let specificBlockFactor = overall.factors;
   if (timeWindow) {
     const matchHour = parseInt(timeWindow);
@@ -241,10 +336,8 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
     }
   }
 
-  // Step 5: Get Gemini safety reasoning text
   let reasoningText = await fetchGeminiReasoning(query, cityObj, activityName, overall, timeWindow);
 
-  // Fallback reasoning text if API call fails
   if (!reasoningText) {
     if (overall.riskLevel === 'SAFE') {
       reasoningText = `Based on high-resolution radar analysis for **${cityObj.name} (${cityObj.zone})**${
@@ -259,22 +352,17 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
     }
   }
 
-  // Format Optimal Window string
-  let optimalWindowText = null;
+  let optimalWindowText = '05:00 AM – 08:30 AM';
   if (optimalWindow && optimalWindow.start && optimalWindow.end) {
     try {
       optimalWindowText = `${new Date(optimalWindow.start).toLocaleTimeString('en-IN', {
         hour: '2-digit',
         minute: '2-digit',
       })} – ${new Date(optimalWindow.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-    } catch {
-      optimalWindowText = '05:00 AM – 08:30 AM';
-    }
-  } else {
-    optimalWindowText = '05:00 AM – 08:30 AM';
+    } catch {}
   }
 
-  const responseMessage = {
+  return {
     id: `msg-${Date.now()}`,
     sender: 'ai',
     text: reasoningText,
@@ -297,7 +385,6 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
     cityObj,
     forecastBlocks,
   };
-
-  return responseMessage;
 }
+
 
