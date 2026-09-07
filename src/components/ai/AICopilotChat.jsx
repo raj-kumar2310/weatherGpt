@@ -3,7 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Bot, User, Sparkles, Plus, MessageSquare, Trash2,
-  ChevronRight, Radio, PanelLeftClose, PanelLeft, Clock, MapPin
+  ChevronRight, Radio, PanelLeftClose, PanelLeft, Clock, MapPin,
+  Mic, MicOff, Volume2, VolumeX, Globe, Search, ShieldAlert, CloudRain, Zap, Sun, X
 } from 'lucide-react';
 import useAppStore from '../../store/appStore';
 import { SUGGESTION_PROMPTS, processAICopilotQuery } from '../../lib/aiCopilot';
@@ -31,6 +32,19 @@ export function AICopilotChat() {
   const [inputQuery, setInputQuery] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [language, setLanguage] = useState('en'); // 'en' | 'ta'
+
+  // Voice Speech-to-Text State
+  const [isListening, setIsListening] = useState(false);
+
+  // Text-to-Speech State
+  const [speakingMsgId, setSpeakingMsgId] = useState(null);
+
+  // Map & Location Search State
+  const [mapSearchQuery, setMapSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
 
   // Chat sessions state (stored in state & localStorage)
   const [sessions, setSessions] = useState(() => {
@@ -83,7 +97,9 @@ export function AICopilotChat() {
         {
           id: `welcome-${Date.now()}`,
           sender: 'ai',
-          text: `Started a new conversation session 🌦️. Select a location below or ask me any weather decision question!`,
+          text: language === 'ta'
+            ? `புதிய உரையாடல் தொடங்கப்பட்டது 🌦️. கீழே உள்ள இடத்தைத் தேர்ந்தெடுக்கவும் அல்லது கேள்விகளைக் கேட்கவும்!`
+            : `Started a new conversation session 🌦️. Select a location below or ask me any weather decision question!`,
           timestamp: 'Just now',
         },
       ],
@@ -140,7 +156,7 @@ export function AICopilotChat() {
     setIsThinking(true);
 
     try {
-      const aiResponse = await processAICopilotQuery(query, forecastBlocks, { userType, location });
+      const aiResponse = await processAICopilotQuery(query, forecastBlocks, { userType, location, language });
       setSessions((prev) =>
         prev.map((s) =>
           s.id === activeSessionId
@@ -167,9 +183,78 @@ export function AICopilotChat() {
     }
   };
 
-  // Switch Target Location from Choice Picker
+  // Speech-to-Text (Voice Input 🎙️)
+  const handleMicClick = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Voice recognition is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = language === 'ta' ? 'ta-IN' : 'en-IN';
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputQuery(transcript);
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
+
+  // Text-to-Speech (Speaker 🔊)
+  const handleSpeakText = (msgId, text) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (speakingMsgId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*#_`]/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = language === 'ta' ? 'ta-IN' : 'en-IN';
+    utterance.onend = () => setSpeakingMsgId(null);
+    utterance.onerror = () => setSpeakingMsgId(null);
+    setSpeakingMsgId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Google Maps Style Location Search
+  const handleMapSearchChange = async (val) => {
+    setMapSearchQuery(val);
+    if (val.trim().length >= 2) {
+      setIsSearching(true);
+      const results = await searchCities(val);
+      setSearchResults(results || []);
+      setIsSearching(false);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  // Switch Target Location from Choice Picker or Search
   const handleSelectCity = async (cityName) => {
     try {
+      setShowMapModal(false);
+      setMapSearchQuery('');
+      setSearchResults([]);
       const geoResults = await searchCities(cityName);
       if (geoResults && geoResults.length > 0) {
         const geo = geoResults[0];
@@ -189,7 +274,11 @@ export function AICopilotChat() {
         if (freshForecast?.blocks) setForecastBlocks(freshForecast.blocks);
 
         // Trigger ChatGPT decision recommendation for selected location
-        handleSend(`What is tomorrow's weather forecast, best place to visit, and safe activities for ${cityObj.name}?`);
+        const promptText = language === 'ta'
+          ? `${cityObj.name} நகரத்திற்கு நாளைய வானிலை, செல்ல சிறந்த இடம் மற்றும் பாதுகாப்பு நடவடிக்கைகள் என்ன?`
+          : `What is tomorrow's weather forecast, best place to visit, and safe activities for ${cityObj.name}?`;
+
+        handleSend(promptText);
       }
     } catch {}
   };
@@ -216,7 +305,7 @@ export function AICopilotChat() {
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden flex flex-col md:flex-row h-[640px]">
+    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden flex flex-col md:flex-row h-[660px] relative">
       {/* Left Sidebar: ChatGPT Style Chat History */}
       <AnimatePresence initial={false}>
         {sidebarOpen && (
@@ -292,7 +381,7 @@ export function AICopilotChat() {
             {/* Sidebar Footer */}
             <div className="p-3 bg-slate-950/60 border-t border-slate-800 text-[11px] text-slate-400 flex justify-between items-center flex-shrink-0">
               <span>Sessions: {sessions.length}</span>
-              <span className="text-sky-400 font-semibold">Tamil Nadu Micro-zones</span>
+              <span className="text-sky-400 font-semibold">WeatherGPT Engine</span>
             </div>
           </motion.div>
         )}
@@ -317,7 +406,7 @@ export function AICopilotChat() {
 
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-base tracking-tight">WeatherAction AI Assistant</h3>
+                <h3 className="font-extrabold text-base tracking-tight">WeatherGPT AI Assistant</h3>
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   Online
                 </span>
@@ -328,13 +417,45 @@ export function AICopilotChat() {
             </div>
           </div>
 
-          <button
-            onClick={handleNewChat}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-colors"
-          >
-            <Plus size={14} />
-            <span>New Chat</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Language Toggle Button */}
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-all border border-white/20"
+              title="Switch Language (English / தமிழ்)"
+            >
+              <Globe size={14} className="text-sky-300" />
+              <span>{language === 'en' ? 'EN' : 'தமிழ்'}</span>
+            </button>
+
+            {/* Google Maps Search Modal Trigger */}
+            <button
+              onClick={() => setShowMapModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-extrabold shadow-sm transition-all"
+            >
+              <Search size={14} />
+              <span className="hidden sm:inline">Find Places</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Risk Detection Alerts Bar (Matching Flow Diagram) */}
+        <div className="bg-slate-950 text-white px-4 py-1.5 border-b border-slate-800 flex items-center justify-between text-[11px] font-bold overflow-x-auto scrollbar-hide flex-shrink-0">
+          <div className="flex items-center gap-1.5 text-slate-400 uppercase tracking-wider text-[10px]">
+            <ShieldAlert size={13} className="text-amber-400" />
+            <span>Risk Detection:</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-sky-300 bg-sky-950/80 px-2.5 py-0.5 rounded-full border border-sky-500/30">
+              <CloudRain size={12} /> Rain/Flood: Low
+            </span>
+            <span className="flex items-center gap-1 text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              <Zap size={12} /> Storm/Wind: Mild
+            </span>
+            <span className="flex items-center gap-1 text-amber-300 bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+              <Sun size={12} /> Heat: Moderate
+            </span>
+          </div>
         </div>
 
         {/* Location Choice Selector Bar */}
@@ -412,7 +533,20 @@ export function AICopilotChat() {
                 >
                   <div className="flex items-center justify-between text-[11px] mb-1.5 opacity-70">
                     <span className="font-bold">{msg.sender === 'user' ? 'You' : 'AI Assistant'}</span>
-                    <span>{msg.timestamp}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{msg.timestamp}</span>
+                      {msg.sender === 'ai' && (
+                        <button
+                          onClick={() => handleSpeakText(msg.id, msg.text)}
+                          className={`p-1 rounded-md transition-colors ${
+                            speakingMsgId === msg.id ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700'
+                          }`}
+                          title="Read out text (Voice output 🔊)"
+                        >
+                          {speakingMsgId === msg.id ? <VolumeX size={14} className="animate-pulse" /> : <Volume2 size={14} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="whitespace-pre-wrap">{msg.text}</div>
                 </div>
@@ -499,7 +633,7 @@ export function AICopilotChat() {
               animate={{ opacity: 1 }}
             >
               <Bot size={16} className="text-indigo-600 animate-bounce" />
-              <span>Analyzing Tamil Nadu micro-zones & generating safety evaluation…</span>
+              <span>Analyzing micro-zones & generating WeatherGPT decision…</span>
             </motion.div>
           )}
 
@@ -522,16 +656,36 @@ export function AICopilotChat() {
           ))}
         </div>
 
-        {/* Input Bar */}
-        <div className="p-3 sm:p-4 bg-white border-t border-slate-200/80 flex items-center gap-3 flex-shrink-0">
+        {/* Input Bar with Voice Mic & Send Buttons */}
+        <div className="p-3 sm:p-4 bg-white border-t border-slate-200/80 flex items-center gap-2 flex-shrink-0">
+          {/* Voice Microphone Input Button */}
+          <button
+            onClick={handleMicClick}
+            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+              isListening
+                ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+            }`}
+            title={isListening ? 'Listening...' : 'Voice Input (Speak question 🎙️)'}
+          >
+            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+          </button>
+
           <input
             type="text"
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask AI Assistant about any outdoor plan (e.g., 'Can I cycle to Ooty tomorrow at 7 AM?')..."
+            placeholder={
+              isListening
+                ? 'Listening to your voice...'
+                : language === 'ta'
+                ? 'வானிலை கேள்விகளைக் கேட்கவும் (எ.கா. நாளைய வானிலை எப்படி இருக்கும்?)...'
+                : "Ask AI Assistant about any outdoor plan or location..."
+            }
             className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all"
           />
+
           <button
             onClick={() => handleSend()}
             disabled={!inputQuery.trim() || isThinking}
@@ -545,6 +699,112 @@ export function AICopilotChat() {
           </button>
         </div>
       </div>
+
+      {/* Google Maps Style Location Finder Modal */}
+      <AnimatePresence>
+        {showMapModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs z-50 p-4 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className="bg-white w-full max-w-lg rounded-3xl p-5 border border-slate-200 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-sky-500 text-white font-bold">
+                    <MapPin size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm">Google Maps Location Explorer</h3>
+                    <p className="text-xs text-slate-500">Search any place or micro-zone in India</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMapModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Autocomplete Search Input */}
+              <div className="relative">
+                <Search size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={mapSearchQuery}
+                  onChange={(e) => handleMapSearchChange(e.target.value)}
+                  placeholder="Type city or place name (e.g. Kuniyamuthur, Pollachi, Ooty, Chennai)..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                  autoFocus
+                />
+              </div>
+
+              {/* Autocomplete Search Results */}
+              {isSearching && (
+                <div className="text-center py-4 text-xs font-bold text-slate-400">
+                  Searching OpenWeather geocoding API...
+                </div>
+              )}
+
+              {searchResults.length > 0 && (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto border-t pt-2">
+                  {searchResults.map((res, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelectCity(res.name)}
+                      className="p-2.5 rounded-xl hover:bg-sky-50 flex items-center justify-between cursor-pointer border border-transparent hover:border-sky-200 transition-all text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin size={14} className="text-sky-500" />
+                        <span className="font-bold text-slate-800">{res.name}</span>
+                        <span className="text-[11px] text-slate-500">({res.state || 'India'})</span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-sky-600 bg-sky-100 px-2 py-0.5 rounded-md">
+                        Select Place
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Safe Nearby Places Recommendations (From Diagram) */}
+              <div className="pt-2 space-y-2 border-t">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <ShieldAlert size={12} className="text-emerald-500" /> Recommended Safe Nearby Zones:
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    { name: 'Ooty', desc: 'Pleasant 19°C • Hills', safe: true },
+                    { name: 'Coimbatore', desc: '27°C • Plain Basin', safe: true },
+                    { name: 'Kuniyamuthur', desc: '26°C • Clear Sky', safe: true },
+                    { name: 'Rameswaram', desc: '29°C • Calm Seas', safe: true },
+                  ].map((place) => (
+                    <button
+                      key={place.name}
+                      onClick={() => handleSelectCity(place.name)}
+                      className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-left hover:border-sky-400 hover:bg-sky-50/50 transition-all group"
+                    >
+                      <div className="font-bold text-slate-800 group-hover:text-sky-600 flex justify-between">
+                        <span>{place.name}</span>
+                        <span className="text-emerald-600 text-[10px]">SAFE</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">{place.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+

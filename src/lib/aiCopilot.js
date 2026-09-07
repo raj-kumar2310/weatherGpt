@@ -155,7 +155,7 @@ Return raw JSON ONLY. No markdown wrapper.`;
 /**
  * Call Gemini API to answer conversational & ChatGPT decision-making weather queries
  */
-async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastData) {
+async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastData, language = 'en') {
   if (!GEMINI_API_KEY) return null;
   try {
     const temp = currentWeatherData?.temp || forecastData?.[0]?.temp || 27;
@@ -167,6 +167,7 @@ async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, fo
 
     const qLower = query.toLowerCase();
     const isDecisionQuery = ['place', 'where', 'activity', 'polama', 'panalama', 'nalaki', 'tomorrow', 'suggest', 'recommend', 'plan', 'which'].some((k) => qLower.includes(k));
+    const langPrompt = language === 'ta' ? 'LANGUAGE INSTRUCTION: The user selected TAMIL (தமிழ்). Please provide the response in clear, helpful Tamil with Tamil markdown titles.' : '';
 
     const prompt = `You are WeatherAction ChatGPT AI, a smart decision-making weather & travel expert assistant for Tamil Nadu, India.
 User query: "${query}"
@@ -177,6 +178,8 @@ Current Live Weather Data:
 - Rain Probability: ${rainProb}%
 - Wind Speed: ${windSpeed} km/h
 - Humidity: ${humidity}%
+
+${langPrompt}
 
 ${
   isDecisionQuery
@@ -208,9 +211,10 @@ Please format your response into 4 distinct, elegant markdown sections:
 /**
  * Call Google Gemini API for generative activity weather safety advice
  */
-async function fetchGeminiReasoning(query, city, activityName, overall, timeWindow) {
+async function fetchGeminiReasoning(query, city, activityName, overall, timeWindow, language = 'en') {
   if (!GEMINI_API_KEY) return null;
   try {
+    const langPrompt = language === 'ta' ? 'LANGUAGE INSTRUCTION: Please provide the safety recommendation in clear Tamil language.' : '';
     const prompt = `You are WeatherAction AI Copilot, a hyperlocal micro-zone weather safety expert for Tamil Nadu, India.
 User query: "${query}"
 City/Location: ${city.name} (${city.zone}, ${city.terrain} terrain)
@@ -218,6 +222,8 @@ Activity: ${activityName}
 Time Target: ${timeWindow || 'Requested Time'}
 Calculated Risk Level: ${overall.riskLevel} (Score: ${overall.totalScore}/100)
 Weather Factors: Rain Risk ${overall.factors.rain}%, Wind Speed ${overall.factors.wind} km/h, Humidity ${overall.factors.humidity}%
+
+${langPrompt}
 
 Provide a concise, professional 2-3 sentence safety recommendation with markdown bold highlights tailored specifically to the activity, location (${city.name}), and time. Keep it actionable and empathetic.`;
 
@@ -242,6 +248,7 @@ Provide a concise, professional 2-3 sentence safety recommendation with markdown
  * Process a user prompt and return AI Copilot response
  */
 export async function processAICopilotQuery(query, initialForecastBlocks = [], currentStore = {}) {
+  const language = currentStore.language || 'en';
   // Step 1: Extract intent with Gemini AI or Fallback
   const geminiIntent = await extractIntentWithGemini(query);
   const fallbackIntent = parseIntentFallback(query);
@@ -291,7 +298,7 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
   // CASE 1: Conversational Weather / Temperature Query (isActivityQuery = false)
   // -------------------------------------------------------------
   if (!isActivityQuery) {
-    let generalText = await fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastBlocks);
+    let generalText = await fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastBlocks, language);
 
     if (!generalText) {
       const temp = currentWeatherData?.temp || forecastBlocks?.[0]?.temp || 27;
@@ -349,7 +356,7 @@ export async function processAICopilotQuery(query, initialForecastBlocks = [], c
     }
   }
 
-  let reasoningText = await fetchGeminiReasoning(query, cityObj, activityName, overall, timeWindow);
+  let reasoningText = await fetchGeminiReasoning(query, cityObj, activityName, overall, timeWindow, language);
 
   if (!reasoningText) {
     if (overall.riskLevel === 'SAFE') {
