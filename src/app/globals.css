@@ -159,3 +159,100 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .gradient-hero {
   background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 50%, #4338CA 100%);
 }
+
+/* ── Dynamic Weather Reactive Background Keyframes ─────── */
+@keyframes driftClouds {
+  0%   { transform: translateX(-10%) translateY(0); }
+  50%  { transform: translateX(10%) translateY(-6px); }
+  100% { transform: translateX(-10%) translateY(0); }
+}
+
+@keyframes rainFall {
+  0%   { transform: translateY(-20px) translateX(0); opacity: 0.8; }
+  100% { transform: translateY(120px) translateX(-15px); opacity: 0.1; }
+}
+
+@keyframes sunPulse {
+  0%   { transform: scale(1); opacity: 0.4; }
+  50%  { transform: scale(1.15); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 0.4; }
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes liveGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.4); }
+  50%      { box-shadow: 0 0 14px rgba(16, 185, 129, 0.8); }
+}
+
+.animate-drift-clouds {
+  animation: driftClouds 20s ease-in-out infinite;
+}
+
+.animate-rain-streak {
+  animation: rainFall 1.2s linear infinite;
+}
+
+.animate-sun-glow {
+  animation: sunPulse 6s ease-in-out infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 12s ease infinite;
+}
+
+.animate-live-glow {
+  animation: liveGlow 2s ease-in-out infinite;
+}
+
+/* ── Premium Text & Card Enhancements ────────────────── */
+.text-glow-sky {
+  text-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);
+}
+
+.text-glow-white {
+  text-shadow: 0 2px 12px rgba(255, 255, 255, 0.3);
+}
+
+.card-hover-lift {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 35px -10px rgba(14, 165, 233, 0.2);
+}
+
+/* ── Clean Card & Design System Tokens ──────────────── */
+.clean-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 20px;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.04);
+}
+
+.clean-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.clean-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(14, 165, 233, 0.4);
+  box-shadow: 0 16px 32px -10px rgba(14, 165, 233, 0.15);
+}
+
+/* ── Accessibility & Reduced Motion ─────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+

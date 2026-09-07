@@ -164,11 +164,13 @@ export function LiveMonitoring() {
           <div>
             <div className="flex items-center gap-2">
               <motion.div
-                className="w-2.5 h-2.5 rounded-full bg-emerald-500"
+                className={`w-2.5 h-2.5 rounded-full ${simulationActive ? 'bg-amber-500' : 'bg-emerald-500'}`}
                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
               />
-              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Live Atmospheric Monitoring</p>
+              <p className={`text-xs font-bold uppercase tracking-wider ${simulationActive ? 'text-amber-600' : 'text-emerald-600'}`}>
+                {simulationActive ? 'SIH DEMO SIMULATION MODE ACTIVE' : 'LIVE RADAR POLLING MODE'}
+              </p>
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 mt-1 flex items-center gap-2">
               <span>{activity?.icon}</span>
@@ -177,10 +179,18 @@ export function LiveMonitoring() {
             <p className="text-xs text-slate-500">Target Zone: {location?.name || 'Coimbatore'} · {location?.zone || 'Micro-zone'}</p>
           </div>
 
-          {/* Last updated / cache indicator */}
-          <div className="text-left sm:text-right">
+          {/* Mode Badge & Last updated / cache indicator */}
+          <div className="flex flex-wrap items-center gap-2 text-left sm:text-right">
+            <span className={`text-xs font-black px-3 py-1 rounded-full border ${
+              simulationActive
+                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-300 animate-live-glow'
+            }`}>
+              {simulationActive ? '⚡ SIMULATION MODE' : '📡 REAL-TIME RADAR'}
+            </span>
+
             {weatherFromCache ? (
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-xl border border-amber-200">
                 <WifiOff size={13} />
                 <span>Cached Data ({weatherCacheAge}m ago)</span>
               </div>

@@ -28,11 +28,13 @@ export function AICopilotChat() {
   const setScreen = useAppStore((s) => s.setScreen);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setLiveMonitoring = useAppStore((s) => s.setLiveMonitoring);
+  const setLanguage = useAppStore((s) => s.setLanguage);
 
   const [inputQuery, setInputQuery] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [language, setLanguage] = useState('en'); // 'en' | 'ta'
+  const storeLanguage = useAppStore((s) => s.language) || 'en';
+  const language = storeLanguage;
 
   // Voice Speech-to-Text State
   const [isListening, setIsListening] = useState(false);

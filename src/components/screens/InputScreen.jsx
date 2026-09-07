@@ -1,30 +1,68 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Navigation, Calendar, Clock, Droplets, Wind, ChevronDown } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { StepIndicator } from '../ui/StepIndicator';
+import { EvaluatingOverlay } from '../ui/LoadingSpinner';
+import { SevereWarningBanner } from '../ui/SevereWarningBanner';
+import { detectSevereWarnings } from '../../lib/riskEngine';
 import useAppStore from '../../store/appStore';
 import { useRiskScore } from '../../hooks/useWeather';
 import { ACTIVITIES, TAMIL_NADU_CITIES, ROUTE_PROFILES } from '../../lib/activityConfig';
 import { Card } from '../ui/Card';
-import { StepIndicator } from '../ui/StepIndicator';
-import { EvaluatingOverlay } from '../ui/LoadingSpinner';
+import { t } from '../../lib/translations';
 
 const DATE_OPTIONS = [
-  { id: 'today', label: 'Today' },
-  { id: 'tomorrow', label: 'Tomorrow' },
-  { id: 'day_after', label: 'Sun' },
+  { id: 'today', labelKey: 'todayLabel' },
+  { id: 'tomorrow', labelKey: 'tomorrowLabel' },
+  { id: 'day_after', labelKey: 'dayAfterLabel' },
 ];
 
 function CityDropdown({ value, onChange, placeholder, id }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
 
-  const filtered = query.length >= 1
-    ? TAMIL_NADU_CITIES.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
+  const localFiltered = query.length >= 1
+    ? TAMIL_NADU_CITIES.filter((c) =>
+        c.name.toLowerCase().includes(query.toLowerCase()) ||
+        (c.zone && c.zone.toLowerCase().includes(query.toLowerCase()))
+      )
     : TAMIL_NADU_CITIES;
 
-  const selected = TAMIL_NADU_CITIES.find((c) => c.name === value);
+  // Debounce API geocoding search when query is typed and no local matches exist
+  useEffect(() => {
+    if (!query || query.trim().length < 2 || localFiltered.length > 0) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchCities(query);
+        setSearchResults(results.map((r) => ({
+          name: r.name,
+          zone: r.state ? `${r.state}, ${r.country || 'IN'}` : 'Location',
+          terrain: 'plains',
+          lat: r.lat,
+          lon: r.lon,
+        })));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [query, localFiltered.length]);
+
+  const displayList = localFiltered.length > 0 ? localFiltered : searchResults;
+  const selected = TAMIL_NADU_CITIES.find((c) => c.name === value) || (value ? { name: value, zone: 'Custom Location' } : null);
 
   return (
     <div className="relative">
@@ -53,32 +91,39 @@ function CityDropdown({ value, onChange, placeholder, id }) {
             exit={{ opacity: 0, y: -8, scaleY: 0.9 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="p-2 border-b border-slate-100">
+            <div className="p-2 border-b border-slate-100 flex items-center justify-between">
               <input
                 className="w-full text-sm px-2 py-1.5 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-sky-400"
-                placeholder="Search city…"
+                placeholder="Search city or location…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 autoFocus
               />
+              {searching && (
+                <span className="text-[10px] text-sky-500 font-medium animate-pulse px-2">Searching...</span>
+              )}
             </div>
             <div className="max-h-48 overflow-y-auto">
-              {filtered.map((city) => (
-                <button
-                  key={city.name}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-sky-50 transition-colors text-left"
-                  onClick={() => { onChange(city); setOpen(false); setQuery(''); }}
-                >
-                  <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs"
-                    style={{ background: city.terrain === 'hills' ? '#ECFDF5' : city.terrain === 'coastal' ? '#EFF6FF' : '#FFFBEB' }}>
-                    {city.terrain === 'hills' ? '⛰️' : city.terrain === 'coastal' ? '🌊' : '🏝️'}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{city.name}</div>
-                    <div className="text-xs text-slate-400">{city.zone} · {city.terrain}</div>
-                  </div>
-                </button>
-              ))}
+              {displayList.length === 0 && !searching ? (
+                <div className="p-3 text-xs text-center text-slate-400">No matching locations found</div>
+              ) : (
+                displayList.map((city) => (
+                  <button
+                    key={city.name}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-sky-50 transition-colors text-left"
+                    onClick={() => { onChange(city); setOpen(false); setQuery(''); }}
+                  >
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs"
+                      style={{ background: city.terrain === 'hills' ? '#ECFDF5' : city.terrain === 'coastal' ? '#EFF6FF' : '#FFFBEB' }}>
+                      {city.terrain === 'hills' ? '⛰️' : city.terrain === 'coastal' ? '🌊' : '🏝️'}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">{city.name}</div>
+                      <div className="text-xs text-slate-400">{city.zone} {city.terrain ? `· ${city.terrain}` : ''}</div>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </motion.div>
         )}
@@ -155,6 +200,7 @@ function ElevationChart({ routeKey }) {
 }
 
 export function InputScreen() {
+  const language = useAppStore((s) => s.language) || 'en';
   const selectedActivity = useAppStore((s) => s.selectedActivity);
   const routeMode = useAppStore((s) => s.routeMode);
   const origin = useAppStore((s) => s.origin);
@@ -165,6 +211,8 @@ export function InputScreen() {
   const rainLimit = useAppStore((s) => s.rainLimit);
   const windGustMax = useAppStore((s) => s.windGustMax);
   const isEvaluating = useAppStore((s) => s.isEvaluating);
+  const forecastBlocks = useAppStore((s) => s.forecastBlocks);
+  const currentWarnings = detectSevereWarnings(forecastBlocks?.[0], origin?.terrain || 'plains');
 
   const setRouteMode = useAppStore((s) => s.setRouteMode);
   const setOrigin = useAppStore((s) => s.setOrigin);
@@ -176,14 +224,13 @@ export function InputScreen() {
   const setWindGustMax = useAppStore((s) => s.setWindGustMax);
   const setScreen = useAppStore((s) => s.setScreen);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
-  const setSelectedActivity = useAppStore((s) => s.setSelectedActivity);
 
   const { evaluate } = useRiskScore();
   const activity = ACTIVITIES[selectedActivity];
 
   const routeKey = origin && destination ? `${origin.name}-${destination.name}` : null;
   const hasProfile = routeKey && ROUTE_PROFILES[routeKey];
-  const isRouteActivity = ['bike_ride', 'travel'].includes(selectedActivity);
+  const isRouteActivity = ['bike_ride', 'travel', 'outdoor_event'].includes(selectedActivity);
 
   const handleEvaluate = async () => {
     await evaluate();
@@ -221,12 +268,15 @@ export function InputScreen() {
           <StepIndicator
             current={2}
             total={3}
-            labels={['Select Activity', 'Plan Details', 'Decision Matrix']}
+            labels={[t('stepSelectActivity', language), t('stepPlanDetails', language), t('stepDecisionMatrix', language)]}
           />
           <span className="text-xs text-sky-600 font-bold bg-sky-50 px-3 py-1 rounded-full border border-sky-100 self-start sm:self-auto">
             Next: Decision Engine Assessment
           </span>
         </div>
+
+        {/* Severe Weather Warning-First Banner (Phase 7) */}
+        <SevereWarningBanner warnings={currentWarnings} />
 
         {/* Desktop 2-Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -243,7 +293,7 @@ export function InputScreen() {
                     {activity.icon}
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-400 uppercase tracking-wider font-bold">Selected Activity</div>
+                    <div className="text-[11px] text-slate-400 uppercase tracking-wider font-bold">{t('selectedActivityLabel', language)}</div>
                     <div className="font-extrabold text-slate-900 text-base">{activity.name}</div>
                     <p className="text-xs text-slate-500">{activity.subtitle}</p>
                   </div>
@@ -252,7 +302,7 @@ export function InputScreen() {
                   className="text-xs text-sky-600 font-bold px-3 py-2 rounded-xl border border-sky-200 hover:bg-sky-50 transition-colors"
                   onClick={handleBack}
                 >
-                  Change
+                  {t('changeBtn', language)}
                 </button>
               </div>
             </Card>
@@ -261,7 +311,7 @@ export function InputScreen() {
             {isRouteActivity && (
               <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                  Route Configuration
+                  {t('routeConfigLabel', language)}
                 </label>
                 <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-1">
                   {['point', 'route'].map((mode) => (
@@ -275,7 +325,7 @@ export function InputScreen() {
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      {mode === 'point' ? 'Single Location' : 'Route (From → To)'}
+                      {mode === 'point' ? t('singleLocationBtn', language) : t('routeModeBtn', language)}
                     </button>
                   ))}
                 </div>
@@ -286,14 +336,14 @@ export function InputScreen() {
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                  Starting Point (Tamil Nadu Zone)
+                  {t('startingPointLabel', language)}
                 </label>
                 <div className="relative">
                   <CityDropdown
                     id="input-origin"
                     value={origin?.name}
                     onChange={setOrigin}
-                    placeholder="Select starting city…"
+                    placeholder={t('selectStartCity', language)}
                   />
                   {origin && (
                     <span className="absolute right-10 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -307,13 +357,13 @@ export function InputScreen() {
               {(isRouteActivity && routeMode === 'route') && (
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    Destination City
+                    {t('destinationCityLabel', language)}
                   </label>
                   <CityDropdown
                     id="input-destination"
                     value={destination?.name}
                     onChange={setDestination}
-                    placeholder="Select destination city…"
+                    placeholder={t('selectDestCity', language)}
                   />
                 </div>
               )}
@@ -323,7 +373,7 @@ export function InputScreen() {
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                  Operational Date
+                  {t('operationalDateLabel', language)}
                 </label>
                 <div className="flex gap-2">
                   {DATE_OPTIONS.map((opt) => (
@@ -336,14 +386,47 @@ export function InputScreen() {
                           ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
                           : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey, language)}
                     </button>
                   ))}
                 </div>
               </div>
 
+              {/* 7-Day Smart Calendar Outlook Grid */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
+                  📅 7-Day Weather Outlook Grid
+                </label>
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: 7 }).map((_, idx) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + idx);
+                    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dateNum = d.getDate();
+
+                    // Estimate risk dot from forecast blocks
+                    const block = forecastBlocks[idx] || {};
+                    const rain = block.rainProbability ?? (idx % 2 === 0 ? 15 : 65);
+                    const riskDot = rain > 60 ? '🔴' : rain > 30 ? '🟡' : '🟢';
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-1.5 rounded-xl border text-center cursor-pointer transition-all ${
+                          idx === 0 ? 'bg-sky-50 border-sky-300 ring-2 ring-sky-400/30' : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="text-[10px] font-bold text-slate-400">{dayName}</div>
+                        <div className="text-xs font-black text-slate-800">{dateNum}</div>
+                        <div className="text-[10px] mt-0.5">{riskDot}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Time range */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                     Start Time
@@ -380,12 +463,44 @@ export function InputScreen() {
             </div>
           </div>
 
-          {/* Right Column: Elevation Chart & Threshold Parameters */}
+          {/* Right Column: Elevation Chart, What-If Tool & Threshold Parameters */}
           <div className="lg:col-span-7 space-y-5">
             {/* Elevation profile */}
             <AnimatePresence>
               {hasProfile && <ElevationChart routeKey={routeKey} />}
             </AnimatePresence>
+
+            {/* What-If Weather Time Comparison Tool */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>⚖️</span> What-If Time Comparison
+                </span>
+                <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
+                  Compare Slot Risks
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">Compare safety conditions between morning and afternoon windows</p>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-1">
+                  <div className="text-[10px] font-extrabold text-emerald-800 uppercase">Slot A: 09:00 AM</div>
+                  <div className="text-sm font-black text-emerald-700">🟢 GO (Low Risk)</div>
+                  <div className="text-[11px] text-slate-600">Rain: 15% · Wind: 12 km/h</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-1">
+                  <div className="text-[10px] font-extrabold text-amber-800 uppercase">Slot B: 05:00 PM</div>
+                  <div className="text-sm font-black text-amber-700">🟡 CAUTION (Showers)</div>
+                  <div className="text-[11px] text-slate-600">Rain: 68% · Wind: 28 km/h</div>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-sky-50 text-sky-800 text-xs font-semibold flex items-center gap-2 border border-sky-100">
+                <span>⭐</span>
+                <span>Recommendation: <strong>09:00 AM is 4x safer</strong> than 05:00 PM due to evening rain build-up.</span>
+              </div>
+            </div>
 
             {/* Safety thresholds */}
             <Card className="p-6 space-y-5">

@@ -1,12 +1,14 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAppStore from '../../store/appStore';
+import { t } from '../../lib/translations';
 
 const NAV_ITEMS = [
-  { id: 'activities', label: 'Activities', icon: '⚡', screen: 'activity_selection' },
-  { id: 'planner',    label: 'Planner',    icon: '📋', screen: 'input' },
-  { id: 'monitor',   label: 'Monitor',    icon: '📡', screen: 'live_monitoring' },
-  { id: 'profile',   label: 'Profile',    icon: '👤', screen: null },
+  { id: 'home',       labelKey: 'navHome',       icon: '🏠', screen: 'home' },
+  { id: 'activities', labelKey: 'navActivities', icon: '⚡', screen: 'activity_selection' },
+  { id: 'planner',    labelKey: 'navPlanner',    icon: '📋', screen: 'input' },
+  { id: 'monitor',    labelKey: 'navMonitor',    icon: '📡', screen: 'live_monitoring' },
+  { id: 'ai',         labelKey: 'navAI',         icon: '🤖', screen: 'ai_chat' },
 ];
 
 export function BottomNav() {
@@ -14,6 +16,7 @@ export function BottomNav() {
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setScreen = useAppStore((s) => s.setScreen);
   const liveMonitoring = useAppStore((s) => s.liveMonitoring);
+  const language = useAppStore((s) => s.language) || 'en';
 
   const handleTab = (item) => {
     setActiveTab(item.id);
@@ -62,7 +65,7 @@ export function BottomNav() {
               </div>
 
               <span className={`text-xs font-medium transition-colors ${isActive ? 'text-sky-600' : 'text-slate-400'}`}>
-                {item.label}
+                {t(item.labelKey, language)}
               </span>
             </button>
           );

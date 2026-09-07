@@ -200,10 +200,79 @@ export function evaluateTimeline(forecastBlocks, activityId, terrain = 'plains')
       riskLevel: worstBlock.riskLevel,
       factors: avgFactors,
       weights: worstBlock.weights,
+      warnings: detectSevereWarnings(worstBlock, terrain),
+      worstBlock,
     },
     blocks: scoredBlocks,
     optimalWindow,
   };
+}
+
+/**
+ * Detect severe weather warnings from forecast parameters and terrain.
+ */
+export function detectSevereWarnings(forecastBlock, terrain = 'plains') {
+  if (!forecastBlock) return [];
+  const warnings = [];
+
+  const rain = forecastBlock.rainProbability || 0;
+  const wind = forecastBlock.windSpeed || 0;
+  const visibility = forecastBlock.visibility || 10000;
+  const uv = forecastBlock.uvIndex || 0;
+  const temp = forecastBlock.temp || 0;
+  const weatherId = forecastBlock.weatherId || 800;
+
+  if (weatherId >= 200 && weatherId <= 232) {
+    warnings.push({
+      type: 'THUNDERSTORM',
+      title: 'Thunderstorm & Lightning Hazard',
+      description: 'Active electrical storm detected. Seek immediate indoor shelter. Avoid tall trees and open fields.',
+      severity: 'CRITICAL',
+      icon: '🌩️',
+    });
+  }
+
+  if (rain > 60 || (forecastBlock.rain3h && forecastBlock.rain3h > 10)) {
+    warnings.push({
+      type: 'HEAVY_RAIN',
+      title: 'Heavy Rainfall Advisory',
+      description: `Precipitation probability at ${rain}%. High risk of waterlogging, flash flooding, and reduced braking distance.`,
+      severity: 'CRITICAL',
+      icon: '🌧️',
+    });
+  }
+
+  if (wind > 40 || (terrain === 'hills' && wind > 30)) {
+    warnings.push({
+      type: 'EXTREME_WIND',
+      title: terrain === 'hills' ? 'Ghat Wind Gust Hazard' : 'High Wind Speed Alert',
+      description: `Wind speed reaching ${Math.round(wind)} km/h. Danger of vehicle instability and falling tree branches on mountain routes.`,
+      severity: terrain === 'hills' ? 'CRITICAL' : 'WARNING',
+      icon: '💨',
+    });
+  }
+
+  if (visibility < 2000) {
+    warnings.push({
+      type: 'POOR_VISIBILITY',
+      title: 'Dense Fog & Low Visibility Warning',
+      description: `Visibility dropped to ${(visibility / 1000).toFixed(1)} km. Fog lights required. Maintain extended vehicle gap.`,
+      severity: 'WARNING',
+      icon: '🌫️',
+    });
+  }
+
+  if (uv >= 8 || temp > 38) {
+    warnings.push({
+      type: 'EXTREME_HEAT',
+      title: 'Extreme Heat & UV Exposure Alert',
+      description: `UV Index at ${uv} (${temp}°C). High heat exhaustion and sunburn hazard during noon hours.`,
+      severity: 'WARNING',
+      icon: '☀️',
+    });
+  }
+
+  return warnings;
 }
 
 /**
@@ -221,3 +290,4 @@ export function getRiskDisplay(riskLevel) {
       return { label: 'UNKNOWN', color: '#6B7280', bgColor: '#F3F4F6', borderColor: '#D1D5DB', textColor: '#374151' };
   }
 }
+

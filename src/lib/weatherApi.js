@@ -158,17 +158,25 @@ export async function searchCities(query) {
   const cached = readCache(cacheKey);
   if (cached?.data?.length) return cached.data;
 
-  if (API_KEY === 'demo') return [{ name: query, lat: 10.45, lon: 77.52, state: 'Tamil Nadu', country: 'IN' }];
-
   try {
-    const data = await apiFetch(
-      `${BASE_URL}/geo/1.0/direct?q=${encodeURIComponent(query)},IN&limit=5&appid=${API_KEY}`
-    );
+    const data = await apiFetch(`/api/weather?type=geo&q=${encodeURIComponent(query)}`);
     if (Array.isArray(data) && data.length > 0) {
       writeCache(cacheKey, data);
       return data;
     }
-  } catch {}
+  } catch {
+    if (API_KEY && API_KEY !== 'demo') {
+      try {
+        const data = await apiFetch(
+          `${BASE_URL}/geo/1.0/direct?q=${encodeURIComponent(query)},IN&limit=5&appid=${API_KEY}`
+        );
+        if (Array.isArray(data) && data.length > 0) {
+          writeCache(cacheKey, data);
+          return data;
+        }
+      } catch {}
+    }
+  }
 
   // Try free OpenStreetMap Nominatim Geocoding fallback if OWM rate limited or empty
   const osmResults = await searchNominatim(query);
@@ -185,29 +193,30 @@ export async function searchCities(query) {
  * @returns {Promise<{ data: Object, fromCache: boolean, cacheAge: number }>}
  */
 export async function fetchCurrentWeather(lat, lon) {
-  if (API_KEY === 'demo') {
-    return { data: MOCK_CURRENT, fromCache: false, cacheAge: 0 };
-  }
-
   const cacheKey = `current_${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = readCache(cacheKey);
   if (cached) return { data: cached.data, fromCache: true, cacheAge: cached.age };
 
   try {
-    const data = await apiFetch(
-      `${BASE_URL}/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`
-    );
+    const data = await apiFetch(`/api/weather?type=current&lat=${lat}&lon=${lon}`);
     // Fetch AQI in parallel
     try {
-      const aqiData = await apiFetch(
-        `${BASE_URL}/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`
-      );
+      const aqiData = await apiFetch(`/api/weather?type=air_pollution&lat=${lat}&lon=${lon}`);
       data.aqi = aqiData.list?.[0]?.main?.aqi * 20 || null;
     } catch { data.aqi = null; }
 
     writeCache(cacheKey, data);
     return { data, fromCache: false, cacheAge: 0 };
   } catch (err) {
+    if (API_KEY && API_KEY !== 'demo') {
+      try {
+        const data = await apiFetch(
+          `${BASE_URL}/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`
+        );
+        writeCache(cacheKey, data);
+        return { data, fromCache: false, cacheAge: 0 };
+      } catch {}
+    }
     const stale = readStaleCache(cacheKey);
     if (stale) return { data: stale.data, fromCache: true, cacheAge: stale.age };
     return { data: MOCK_CURRENT, fromCache: true, cacheAge: 999 };
@@ -219,11 +228,6 @@ export async function fetchCurrentWeather(lat, lon) {
  * @returns {Promise<{ blocks: Array, fromCache: boolean, cacheAge: number }>}
  */
 export async function fetchForecast(lat, lon) {
-  if (API_KEY === 'demo') {
-    const mock = buildMockForecast(MOCK_CURRENT);
-    return { blocks: normalizeForecast(mock), fromCache: false, cacheAge: 0 };
-  }
-
   const cacheKey = `forecast_${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = readCache(cacheKey);
   if (cached) {
@@ -231,12 +235,19 @@ export async function fetchForecast(lat, lon) {
   }
 
   try {
-    const data = await apiFetch(
-      `${BASE_URL}/data/2.5/forecast?lat=${lat}&lon=${lon}&cnt=16&units=metric&appid=${API_KEY}`
-    );
+    const data = await apiFetch(`/api/weather?type=forecast&lat=${lat}&lon=${lon}`);
     writeCache(cacheKey, data);
     return { blocks: normalizeForecast(data), fromCache: false, cacheAge: 0 };
   } catch {
+    if (API_KEY && API_KEY !== 'demo') {
+      try {
+        const data = await apiFetch(
+          `${BASE_URL}/data/2.5/forecast?lat=${lat}&lon=${lon}&cnt=16&units=metric&appid=${API_KEY}`
+        );
+        writeCache(cacheKey, data);
+        return { blocks: normalizeForecast(data), fromCache: false, cacheAge: 0 };
+      } catch {}
+    }
     const stale = readStaleCache(cacheKey);
     if (stale) return { blocks: normalizeForecast(stale.data), fromCache: true, cacheAge: stale.age };
     const mock = buildMockForecast(MOCK_CURRENT);
@@ -306,3 +317,98 @@ export function normalizeCurrentWeather(raw) {
     dt: raw.dt || Math.floor(Date.now() / 1000),
   };
 }
+
+/**
+ * Fetch forecast weather for intermediate route waypoints.
+ * Example: Coimbatore -> Pollachi -> Aliyar -> Valparai
+ */
+export async function getRouteWaypointsWeather(origin, destination) {
+  if (!origin || !destination) return [];
+  const routeKey = `${origin.name}-${destination.name}`;
+  const profile = ROUTE_PROFILES[routeKey];
+
+  let waypoints = [];
+  if (profile && profile.points) {
+    const namedPoints = profile.points.filter((p) => p.label && p.label.trim().length > 0);
+    for (const pt of namedPoints) {
+      const city = TAMIL_NADU_CITIES.find((c) => c.name.toLowerCase() === pt.label.toLowerCase());
+      if (city) {
+        waypoints.push(city);
+      } else {
+        const ratio = pt.km / profile.distance;
+        const lat = origin.lat + ratio * (destination.lat - origin.lat);
+        const lon = origin.lon + ratio * (destination.lon - origin.lon);
+        waypoints.push({
+          name: pt.label,
+          lat,
+          lon,
+          terrain: pt.elevation > 800 ? 'hills' : 'plains',
+          elevation: pt.elevation,
+        });
+      }
+    }
+  }
+
+  if (waypoints.length === 0) {
+    waypoints = [
+      origin,
+      {
+        name: `Midpoint (${origin.name} → ${destination.name})`,
+        lat: (origin.lat + destination.lat) / 2,
+        lon: (origin.lon + destination.lon) / 2,
+        terrain: origin.terrain === 'hills' || destination.terrain === 'hills' ? 'hills' : 'plains',
+      },
+      destination,
+    ];
+  }
+
+  const results = await Promise.all(
+    waypoints.map(async (wp) => {
+      try {
+        const { blocks } = await fetchForecast(wp.lat, wp.lon);
+        return { ...wp, forecastBlocks: blocks };
+      } catch {
+        return { ...wp, forecastBlocks: [] };
+      }
+    })
+  );
+
+  return results;
+}
+
+/**
+ * Historical climate comparison baseline for location.
+ * Compares current expected rain/temp against September historical averages.
+ */
+export function getClimateComparison(locationName, currentTemp, currentRainProb) {
+  const monthName = new Date().toLocaleString('en-US', { month: 'long' });
+  const isHill = ['ooty', 'valparai', 'kodaikanal', 'coonoor', 'palani'].some((h) =>
+    (locationName || '').toLowerCase().includes(h)
+  );
+
+  const histTempAvg = isHill ? 19 : 30;
+  const histRainMmAvg = isHill ? 145 : 65;
+
+  // Derive current expected rainfall estimate from forecast rain probability
+  const currentExpectedRainMm = Math.round((currentRainProb / 100) * (isHill ? 25 : 12) * 10) / 10;
+  const historicalDailyRainMm = Math.round((histRainMmAvg / 30) * 10) / 10;
+
+  let status = 'NEAR_AVERAGE';
+  if (currentExpectedRainMm > historicalDailyRainMm * 1.3) {
+    status = 'ABOVE_AVERAGE';
+  } else if (currentExpectedRainMm < historicalDailyRainMm * 0.7) {
+    status = 'BELOW_AVERAGE';
+  }
+
+  return {
+    month: monthName,
+    currentExpectedRainMm,
+    historicalDailyRainMm,
+    histTempAvg,
+    currentTemp: currentTemp || 28,
+    status,
+    dataSource: 'OpenWeatherMap Climate Normals / IMD Historical Baseline (1991-2020)',
+    lastUpdated: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+

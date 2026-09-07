@@ -23,8 +23,8 @@ export function TimelineBlock({ block, index = 0, compact = false }) {
     <div className="relative group flex-1 min-w-0">
       <motion.div
         className={`${colors.bg} ${colors.hover} ${compact ? 'h-8' : 'h-12'} rounded cursor-pointer transition-colors relative overflow-hidden`}
-        initial={{ scaleY: 0, originY: 1 }}
-        animate={{ scaleY: 1 }}
+        initial={{ scaleY: 0, opacity: 0, originY: 1 }}
+        animate={{ scaleY: 1, opacity: 1 }}
         transition={{ delay: index * 0.04, duration: 0.4, ease: 'easeOut' }}
         whileHover={{ scaleY: 1.1 }}
       >

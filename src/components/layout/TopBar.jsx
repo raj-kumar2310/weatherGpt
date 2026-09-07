@@ -2,6 +2,8 @@
 import { WifiOff, CloudSun, MapPin, ChevronRight, User } from 'lucide-react';
 import useAppStore from '../../store/appStore';
 
+import { t } from '../../lib/translations';
+
 const USER_TYPE_ICONS = {
   farmer: '🌾',
   fisherman: '🎣',
@@ -19,10 +21,11 @@ const USER_TYPE_NAMES = {
 };
 
 const NAV_ITEMS = [
-  { id: 'activities', label: 'Activities', icon: '⚡', screen: 'activity_selection' },
-  { id: 'planner',    label: 'Planner Matrix', icon: '📋', screen: 'input' },
-  { id: 'monitor',   label: 'Live Monitor',   icon: '📡', screen: 'live_monitoring' },
-  { id: 'profile',   label: 'Persona & Settings', icon: '👤', screen: null },
+  { id: 'home',       labelKey: 'navHome',       icon: '🏠', screen: 'home' },
+  { id: 'activities', labelKey: 'navActivities', icon: '⚡', screen: 'activity_selection' },
+  { id: 'planner',    labelKey: 'navPlanner',    icon: '📋', screen: 'input' },
+  { id: 'monitor',    labelKey: 'navMonitor',    icon: '📡', screen: 'live_monitoring' },
+  { id: 'ai',         labelKey: 'navAI',         icon: '🤖', screen: 'ai_chat' },
 ];
 
 export function TopBar({ title = 'WeatherAction', showBack = false, onBack }) {
@@ -34,6 +37,7 @@ export function TopBar({ title = 'WeatherAction', showBack = false, onBack }) {
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setScreen = useAppStore((s) => s.setScreen);
   const location = useAppStore((s) => s.location);
+  const language = useAppStore((s) => s.language) || 'en';
 
   const handleNavClick = (item) => {
     setActiveTab(item.id);
@@ -59,7 +63,7 @@ export function TopBar({ title = 'WeatherAction', showBack = false, onBack }) {
             </div>
           )}
 
-          <div>
+          <div className="cursor-pointer" onClick={() => { setActiveTab('home'); setScreen('home'); }}>
             <div className="flex items-center gap-2">
               <span className="font-black text-slate-900 text-lg tracking-tight">WeatherAction</span>
               <span className="hidden sm:inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 tracking-wider">
@@ -78,14 +82,14 @@ export function TopBar({ title = 'WeatherAction', showBack = false, onBack }) {
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                   isActive
                     ? 'bg-white text-sky-600 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                 }`}
               >
                 <span>{item.icon}</span>
-                <span>{item.label}</span>
+                <span>{t(item.labelKey, language)}</span>
               </button>
             );
           })}
@@ -110,11 +114,35 @@ export function TopBar({ title = 'WeatherAction', showBack = false, onBack }) {
               <span className="hidden sm:inline font-semibold">Cached ({weatherCacheAge}m)</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200 font-semibold">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200 font-semibold animate-live-glow">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="hidden sm:inline">LIVE RADAR</span>
             </div>
           )}
+
+          {/* Language toggle (EN | தமிழ்) */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+            <button
+              onClick={() => useAppStore.getState().setLanguage('en')}
+              className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                useAppStore((s) => s.language) === 'en'
+                  ? 'bg-sky-500 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => useAppStore.getState().setLanguage('ta')}
+              className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                useAppStore((s) => s.language) === 'ta'
+                  ? 'bg-sky-500 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              தமிழ்
+            </button>
+          </div>
 
           {/* User persona button */}
           <button

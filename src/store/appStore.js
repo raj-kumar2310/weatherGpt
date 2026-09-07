@@ -10,6 +10,10 @@ import { persist } from 'zustand/middleware';
 const useAppStore = create(
   persist(
     (set, get) => ({
+      // ─── Language ─────────────────────────────────────────────────
+      language: 'en',  // 'en' | 'ta'
+      setLanguage: (lang) => set({ language: lang }),
+
       // ─── Onboarding ───────────────────────────────────────────────
       userType: null,         // 'farmer' | 'fisherman' | 'traveller' | 'event_organizer' | 'common_user'
       onboardingDone: false,
@@ -17,12 +21,42 @@ const useAppStore = create(
       setUserType: (userType) => set({ userType, onboardingDone: true }),
 
       // ─── Navigation ───────────────────────────────────────────────
-      // 'onboarding' | 'activity_selection' | 'input' | 'decision_result' | 'live_monitoring'
+      // 'onboarding' | 'home' | 'activity_selection' | 'input' | 'decision_result' | 'live_monitoring' | 'ai_chat'
       screen: 'onboarding',
-      activeTab: 'activities',  // 'activities' | 'planner' | 'monitor' | 'profile'
+      activeTab: 'home',  // 'home' | 'activities' | 'planner' | 'monitor' | 'ai' | 'profile'
 
       setScreen: (screen) => set({ screen }),
       setActiveTab: (tab) => set({ activeTab: tab }),
+
+      // ─── Personal Preferences ────────────────────────────────────
+      personalPreferences: {
+        heatTolerance: 'medium',
+        humidityTolerance: 'medium',
+        windTolerance: 'medium',
+        rainTolerance: 'medium',
+      },
+      setPersonalPreferences: (prefs) => set((s) => ({
+        personalPreferences: { ...s.personalPreferences, ...prefs },
+      })),
+
+      // ─── Saved Places & Plans ────────────────────────────────────
+      savedPlaces: [
+        { id: 'place-home', label: 'Home Base', name: 'Coimbatore', lat: 11.0168, lon: 76.9558, icon: '🏠' },
+        { id: 'place-farm', label: 'Agrarian Field', name: 'Pollachi', lat: 10.6609, lon: 77.0048, icon: '🌾' },
+        { id: 'place-hill', label: 'Ghat Retreat', name: 'Valparai', lat: 10.3204, lon: 76.9511, icon: '⛰️' },
+      ],
+      savedPlans: [
+        {
+          id: 'plan-1',
+          name: 'Morning Field Spraying',
+          activityId: 'farming',
+          locationName: 'Pollachi',
+          date: 'Tomorrow',
+          timeWindow: '07:00 AM – 10:00 AM',
+          riskLevel: 'SAFE',
+        },
+      ],
+      addSavedPlan: (plan) => set((s) => ({ savedPlans: [plan, ...s.savedPlans] })),
 
       // ─── Activity Selection ───────────────────────────────────────
       selectedActivity: null,   // id from ACTIVITIES config
@@ -138,6 +172,10 @@ const useAppStore = create(
         location: state.location,
         rainLimit: state.rainLimit,
         windGustMax: state.windGustMax,
+        language: state.language,
+        personalPreferences: state.personalPreferences,
+        savedPlaces: state.savedPlaces,
+        savedPlans: state.savedPlans,
       }),
     }
   )

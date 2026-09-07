@@ -116,8 +116,8 @@ export function UserTypeSelector() {
                 id={`user-type-${type.id}`}
                 className={`flex flex-col items-center text-center p-6 rounded-3xl border-2 transition-all relative overflow-hidden
                   ${isSelected
-                    ? `${type.bg} ${type.border} shadow-2xl scale-[1.03]`
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+                    ? `${type.bg} ${type.border} ring-4 ring-sky-400/50 shadow-2xl scale-[1.04]`
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 hover:-translate-y-1'}`}
                 onClick={() => setSelected(type.id)}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

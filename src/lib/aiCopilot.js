@@ -11,41 +11,25 @@ import { searchCities, fetchForecast, fetchCurrentWeather, normalizeCurrentWeath
 const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 /**
- * Call Google Gemini REST API with sequential model fallbacks to handle deprecations or 404s
+ * Call Next.js Server API route /api/copilot to interact with Google Gemini AI securely
  */
 async function callGeminiAPI(prompt) {
-  if (!GEMINI_API_KEY) return null;
-  const models = [
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-pro',
-  ];
-
-  for (const model of models) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-      }
-    } catch {
-      // try next model
+  try {
+    const res = await fetch('/api/copilot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.text) return data.text;
     }
+  } catch {
+    // fallback if server route unavailable
   }
   return null;
 }
+
 
 /**
  * Quick prompt suggestions for the chat interface

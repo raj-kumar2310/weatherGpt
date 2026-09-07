@@ -30,7 +30,7 @@ function ActivityCard({ activity, riskLevel, insight, onSelect }) {
   return (
     <div
       onClick={onSelect}
-      className="group cursor-pointer rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-xl hover:border-sky-300 transition-all duration-300 overflow-hidden flex flex-col justify-between"
+      className="group cursor-pointer rounded-2xl bg-white border border-slate-200/80 shadow-xs card-hover-lift hover:border-sky-300 transition-all duration-300 overflow-hidden flex flex-col justify-between"
     >
       <div className="p-5 space-y-4">
         {/* Header row */}
@@ -75,14 +75,50 @@ function ActivityCard({ activity, riskLevel, insight, onSelect }) {
 function WeatherSummaryBar({ weather, location }) {
   if (!weather) return null;
 
+  const desc = (weather.weatherDesc || '').toLowerCase();
+  const isRain = desc.includes('rain') || desc.includes('drizzle') || desc.includes('thunderstorm');
+  const isCloudy = desc.includes('cloud') || desc.includes('overcast') || desc.includes('mist');
+  const isClear = desc.includes('clear') || desc.includes('sun');
+
   const stability =
     weather.humidity > 85 ? { label: 'UNSTABLE ATMOSPHERE', color: 'bg-red-500/20 text-red-100 border-red-400/40' } :
     weather.humidity > 65 ? { label: 'VARIABLE ATMOSPHERE', color: 'bg-amber-500/20 text-amber-100 border-amber-400/40' } :
                             { label: 'STABLE ATMOSPHERE', color: 'bg-emerald-500/20 text-emerald-100 border-emerald-400/40' };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-sky-600 via-sky-700 to-indigo-800 p-6 sm:p-8 text-white shadow-xl shadow-sky-900/10">
-      {/* Background flare */}
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-sky-600 via-sky-700 to-indigo-800 p-6 sm:p-8 text-white shadow-xl shadow-sky-900/10 animate-gradient-shift">
+      {/* Dynamic Weather Reactive Overlay Graphics */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Soft Sun Ray Glow for Clear Sky */}
+        {isClear && (
+          <div className="absolute -top-16 -right-16 w-80 h-80 bg-amber-300/20 rounded-full blur-3xl animate-sun-glow" />
+        )}
+
+        {/* Soft Drifting Clouds for Overcast / Cloudy Sky */}
+        {isCloudy && (
+          <div className="absolute inset-0 opacity-25 animate-drift-clouds">
+            <svg className="w-full h-full" viewBox="0 0 800 200" fill="none">
+              <path d="M 50 120 Q 80 80 130 90 Q 170 60 220 90 Q 260 80 290 120 Z" fill="white" />
+              <path d="M 450 140 Q 480 100 530 110 Q 570 80 620 110 Q 660 100 690 140 Z" fill="white" />
+            </svg>
+          </div>
+        )}
+
+        {/* Soft Animated Rain Streaks for Rain */}
+        {isRain && (
+          <div className="absolute inset-0 opacity-40">
+            {[15, 35, 55, 75, 90].map((left, idx) => (
+              <div
+                key={idx}
+                className="absolute w-[2px] h-10 bg-gradient-to-b from-transparent to-sky-200 animate-rain-streak"
+                style={{ left: `${left}%`, top: '-10px', animationDelay: `${idx * 0.25}s` }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Background flares */}
       <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/3 -mb-12 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
 
@@ -101,7 +137,7 @@ function WeatherSummaryBar({ weather, location }) {
           </div>
 
           <div className="flex items-baseline gap-4">
-            <span className="text-5xl sm:text-6xl font-black tracking-tight">{weather.temp}°C</span>
+            <span className="text-5xl sm:text-6xl font-black tracking-tight text-glow-white">{weather.temp}°C</span>
             <div>
               <p className="text-lg font-bold text-sky-100 capitalize">{weather.weatherDesc}</p>
               <p className="text-xs text-sky-200">Feels like {weather.feelsLike || weather.temp}°C · Tamil Nadu Radar</p>
@@ -110,7 +146,7 @@ function WeatherSummaryBar({ weather, location }) {
         </div>
 
         {/* Right Column: Grid metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-xl p-4 rounded-2xl border border-white/15">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-xl p-4 rounded-2xl border border-white/15 shadow-inner">
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-sky-200 text-xs font-medium">
               <Wind size={13} /> Wind
