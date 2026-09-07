@@ -3,15 +3,16 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Bot, User, Sparkles, Plus, MessageSquare, Trash2,
-  ChevronRight, Radio, PanelLeftClose, PanelLeft, Clock
+  ChevronRight, Radio, PanelLeftClose, PanelLeft, Clock, MapPin
 } from 'lucide-react';
 import useAppStore from '../../store/appStore';
 import { SUGGESTION_PROMPTS, processAICopilotQuery } from '../../lib/aiCopilot';
+import { searchCities, fetchForecast } from '../../lib/weatherApi';
 
 const INITIAL_WELCOME = {
   id: 'welcome-1',
   sender: 'ai',
-  text: `Hello! I am **WeatherAction AI Assistant** 🌦️. Tell me about your outdoor plans in Tamil Nadu (e.g. *"Can I ride my bike to Ooty tomorrow?"* or *"Is sea fishing safe in Rameswaram?"*) and I will generate a real-time safety evaluation for you!`,
+  text: `Hello! I am **WeatherAction AI Assistant** 🌦️. Ask me open-ended decision questions (e.g., *"Nalaki weather enna epdi erukum entha place polama?"* or *"Can I go for a run in Kuniyamuthur?"*) and I will evaluate live weather for you!`,
   timestamp: 'Just now',
 };
 
@@ -82,7 +83,7 @@ export function AICopilotChat() {
         {
           id: `welcome-${Date.now()}`,
           sender: 'ai',
-          text: `Started a new conversation session 🌦️. Ask me about any outdoor activity or plan in Tamil Nadu!`,
+          text: `Started a new conversation session 🌦️. Select a location below or ask me any weather decision question!`,
           timestamp: 'Just now',
         },
       ],
@@ -166,6 +167,33 @@ export function AICopilotChat() {
     }
   };
 
+  // Switch Target Location from Choice Picker
+  const handleSelectCity = async (cityName) => {
+    try {
+      const geoResults = await searchCities(cityName);
+      if (geoResults && geoResults.length > 0) {
+        const geo = geoResults[0];
+        const isHill = ['ooty', 'valparai', 'kodaikanal', 'coonoor'].some((h) => cityName.toLowerCase().includes(h));
+        const isCoast = ['rameswaram', 'chennai', 'cuddalore'].some((c) => cityName.toLowerCase().includes(c));
+        const cityObj = {
+          name: geo.name || cityName,
+          lat: geo.lat,
+          lon: geo.lon,
+          zone: geo.state ? `${geo.name} (${geo.state})` : `${cityName} Area`,
+          terrain: isHill ? 'hills' : isCoast ? 'coastal' : 'plains',
+        };
+        setLocation(cityObj);
+
+        // Fetch fresh forecast for new location
+        const freshForecast = await fetchForecast(cityObj.lat, cityObj.lon);
+        if (freshForecast?.blocks) setForecastBlocks(freshForecast.blocks);
+
+        // Trigger ChatGPT decision recommendation for selected location
+        handleSend(`What is tomorrow's weather forecast, best place to visit, and safe activities for ${cityObj.name}?`);
+      }
+    } catch {}
+  };
+
   const handleLaunchMatrix = (msg) => {
     if (!msg.card) return;
     setSelectedActivity(msg.card.activityId);
@@ -188,7 +216,7 @@ export function AICopilotChat() {
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden flex flex-col md:flex-row h-[620px]">
+    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden flex flex-col md:flex-row h-[640px]">
       {/* Left Sidebar: ChatGPT Style Chat History */}
       <AnimatePresence initial={false}>
         {sidebarOpen && (
@@ -307,6 +335,49 @@ export function AICopilotChat() {
             <Plus size={14} />
             <span>New Chat</span>
           </button>
+        </div>
+
+        {/* Location Choice Selector Bar */}
+        <div className="bg-slate-900/90 text-white px-4 py-2 border-b border-slate-800 flex items-center justify-between gap-3 text-xs overflow-x-auto scrollbar-hide flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <MapPin size={14} className="text-sky-400 animate-pulse" />
+            <span className="font-extrabold text-slate-300">Target Location:</span>
+            <select
+              value={location?.name || 'Coimbatore'}
+              onChange={(e) => handleSelectCity(e.target.value)}
+              className="bg-slate-800 text-white border border-slate-700 font-bold px-3 py-1 rounded-xl text-xs focus:outline-none focus:border-sky-500 cursor-pointer"
+            >
+              <option value="Coimbatore">🏙️ Coimbatore (Basin)</option>
+              <option value="Kuniyamuthur">🏡 Kuniyamuthur (Coimbatore South)</option>
+              <option value="Ooty">🏔️ Ooty (Nilgiris Belt)</option>
+              <option value="Valparai">🌿 Valparai (Anamalai Range)</option>
+              <option value="Chennai">🏖️ Chennai (Coastal)</option>
+              <option value="Madurai">🏛️ Madurai (Vaigai Basin)</option>
+              <option value="Trichy">🌾 Trichy (Kaveri Delta)</option>
+              <option value="Salem">⛰️ Salem (Plateau)</option>
+              <option value="Kodaikanal">🌲 Kodaikanal (Palani Hills)</option>
+              <option value="Rameswaram">🎣 Rameswaram (Coastal)</option>
+              <option value="Thanjavur">🚜 Thanjavur (Delta)</option>
+              <option value="Pollachi">🌴 Pollachi (Foothills)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider hidden md:inline">Quick Choice:</span>
+            {['Coimbatore', 'Kuniyamuthur', 'Ooty', 'Valparai', 'Madurai'].map((cityName) => (
+              <button
+                key={cityName}
+                onClick={() => handleSelectCity(cityName)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                  location?.name?.toLowerCase() === cityName.toLowerCase()
+                    ? 'bg-sky-500 text-white shadow-xs'
+                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                {cityName}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Message Stream */}

@@ -14,11 +14,12 @@ const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
  * Quick prompt suggestions for the chat interface
  */
 export const SUGGESTION_PROMPTS = [
+  { text: 'Nalaki weather enna epdi erukum entha place polama entha activity panalama?', icon: '✨' },
+  { text: 'Which place in Tamil Nadu is best to visit tomorrow?', icon: '📍' },
   { text: 'What is the current temperature in Coimbatore?', icon: '🌡️' },
-  { text: 'Can I go for a bike ride to Ooty tomorrow at 7 AM?', icon: '🚴' },
+  { text: 'Can I go for a run in Kuniyamuthur tomorrow at 5 AM?', icon: '🏃' },
   { text: 'Is it safe to spray pesticides in Tanjavur paddy field today?', icon: '🌾' },
   { text: 'Should I drive through Valparai ghat road this afternoon?', icon: '🚗' },
-  { text: 'Is sea condition safe for boat fishing in Rameswaram?', icon: '🎣' },
 ];
 
 /**
@@ -152,7 +153,7 @@ Return raw JSON ONLY. No markdown wrapper.`;
 }
 
 /**
- * Call Gemini API to answer general conversational weather queries (e.g. "coimbatore tempratore")
+ * Call Gemini API to answer conversational & ChatGPT decision-making weather queries
  */
 async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, forecastData) {
   if (!GEMINI_API_KEY) return null;
@@ -164,17 +165,29 @@ async function fetchGeminiGeneralResponse(query, cityObj, currentWeatherData, fo
     const weatherDesc = currentWeatherData?.weatherDesc || forecastData?.[0]?.weatherDesc || 'scattered clouds';
     const rainProb = forecastData?.[0]?.rainProbability || 10;
 
-    const prompt = `You are WeatherAction AI Assistant, a conversational weather chatbot for Tamil Nadu, India.
+    const qLower = query.toLowerCase();
+    const isDecisionQuery = ['place', 'where', 'activity', 'polama', 'panalama', 'nalaki', 'tomorrow', 'suggest', 'recommend', 'plan', 'which'].some((k) => qLower.includes(k));
+
+    const prompt = `You are WeatherAction ChatGPT AI, a smart decision-making weather & travel expert assistant for Tamil Nadu, India.
 User query: "${query}"
-City/Location: ${cityObj.name} (${cityObj.zone})
-Current Weather Stats:
+Selected Target Location: ${cityObj.name} (${cityObj.zone})
+Current Live Weather Data:
 - Temperature: ${temp}°C (Feels like ${feelsLike}°C)
 - Condition: ${weatherDesc}
-- Rain Chance: ${rainProb}%
+- Rain Probability: ${rainProb}%
 - Wind Speed: ${windSpeed} km/h
 - Humidity: ${humidity}%
 
-Answer the user's question directly and conversationally in 2-3 well-formatted sentences using markdown bold highlights for temperature and key numbers. If they asked for temperature, clearly highlight the temperature. Be helpful, concise, and friendly like ChatGPT.`;
+${
+  isDecisionQuery
+    ? `The user wants a ChatGPT-style DECISION on tomorrow's weather, which place to visit, and which outdoor activity to do!
+Please format your response into 4 distinct, elegant markdown sections:
+1. ☀️ **Tomorrow's Weather Forecast** (Summarize forecast for ${cityObj.name} & Tamil Nadu micro-zones).
+2. 📍 **Recommended Places to Visit** (Suggest 2 top destinations like Ooty for hills, Coimbatore for plains, Tanjavur for farming, etc.).
+3. 🚴 **Best Activities to Do** (Recommend 2 safe outdoor activities like morning running, picnic, or travel with timing).
+4. ⚠️ **Safety Tip & Places to Avoid** (Highlight any fog/rain/wind risk areas like ghat roads).`
+    : `Answer the user's question directly and conversationally in 2-3 well-formatted sentences using markdown bold highlights for temperature and key numbers. If they asked for temperature, clearly highlight the temperature. Be helpful, concise, and friendly like ChatGPT.`
+}`;
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     const res = await fetch(url, {
