@@ -579,12 +579,15 @@ export function AICopilotChat() {
                       {msg.sender === 'ai' && (
                         <button
                           onClick={() => handleSpeakText(msg.id, msg.text)}
-                          className={`p-1 rounded-md transition-colors ${
-                            speakingMsgId === msg.id ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-slate-700'
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all border ${
+                            speakingMsgId === msg.id
+                              ? 'bg-sky-500 text-white border-sky-500 animate-pulse shadow-xs'
+                              : 'bg-slate-100 hover:bg-sky-50 text-slate-700 border-slate-200 hover:text-sky-600'
                           }`}
                           title="Read out text (Voice output 🔊)"
                         >
-                          {speakingMsgId === msg.id ? <VolumeX size={14} className="animate-pulse" /> : <Volume2 size={14} />}
+                          {speakingMsgId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                          <span>{speakingMsgId === msg.id ? 'Stop Voice' : 'Listen 🔊'}</span>
                         </button>
                       )}
                     </div>

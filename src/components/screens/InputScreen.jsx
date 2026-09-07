@@ -12,6 +12,7 @@ import { useRiskScore } from '../../hooks/useWeather';
 import { ACTIVITIES, TAMIL_NADU_CITIES, ROUTE_PROFILES } from '../../lib/activityConfig';
 import { Card } from '../ui/Card';
 import { t } from '../../lib/translations';
+import { CalendarEventPlanner } from './CalendarEventPlanner';
 
 const DATE_OPTIONS = [
   { id: 'today', labelKey: 'todayLabel' },
@@ -501,6 +502,9 @@ export function InputScreen() {
                 <span>Recommendation: <strong>09:00 AM is 4x safer</strong> than 05:00 PM due to evening rain build-up.</span>
               </div>
             </div>
+
+            {/* Smart Calendar Event Intelligence Planner */}
+            <CalendarEventPlanner />
 
             {/* Safety thresholds */}
             <Card className="p-6 space-y-5">
