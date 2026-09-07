@@ -126,7 +126,7 @@ async function extractIntentWithGemini(query) {
 Extract intent as JSON with structure:
 {
   "isActivityQuery": boolean (Set to true ONLY if user asks about planning/doing a specific outdoor activity or safety for an activity like running, cycling, trip, farming, fishing, drive, event. Set to false if user asks for temperature, current weather, greetings, climate, or general info),
-  "locationName": "location or city mentioned (e.g. Coimbatore, Kuniyamuthur, Ooty, Tanjavur, Pollachi, Madurai)",
+  "locationName": "location or city mentioned (e.g. Palani, Coimbatore, Kuniyamuthur, Ooty, Tanjavur, Pollachi, Madurai)",
   "activityId": "one of: bike_ride, picnic, farming, travel, outdoor_event, fishing or null",
   "activityName": "specific action name (e.g. Running, Morning Walk, Bike Ride, Pesticide Spray, Ghat Drive, Sea Fishing) or null",
   "activityIcon": "relevant emoji (e.g. 🏃, 🚴, 🌾, 🚗, 🧺, 🎣, 🎪) or null",
@@ -134,19 +134,10 @@ Extract intent as JSON with structure:
 }
 Return raw JSON ONLY. No markdown wrapper.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(text);
+    const text = await callGeminiAPI(prompt);
+    if (!text) return null;
+    const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
   } catch {
     return null;
   }
@@ -192,17 +183,7 @@ Please format your response into 4 distinct, elegant markdown sections:
     : `Answer the user's question directly and conversationally in 2-3 well-formatted sentences using markdown bold highlights for temperature and key numbers. If they asked for temperature, clearly highlight the temperature. Be helpful, concise, and friendly like ChatGPT.`
 }`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    return await callGeminiAPI(prompt);
   } catch {
     return null;
   }
@@ -227,18 +208,7 @@ ${langPrompt}
 
 Provide a concise, professional 2-3 sentence safety recommendation with markdown bold highlights tailored specifically to the activity, location (${city.name}), and time. Keep it actionable and empathetic.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text || null;
+    return await callGeminiAPI(prompt);
   } catch {
     return null;
   }
